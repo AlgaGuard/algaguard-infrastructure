@@ -20,7 +20,9 @@ jobs:
       - name: Shell lint
         uses: ludeeus/action-shellcheck@master
       - name: Secret scan
-        uses: gitleaks/gitleaks-action@v2
+        run: >-
+          docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.28.0
+          detect --source=/repo --no-banner --redact --exit-code=1
       - name: Core smoke test
         run: sh scripts/smoke.sh
   vertical-slice:
