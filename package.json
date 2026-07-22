@@ -1,0 +1,12 @@
+{
+  "name": "@algaguard/infrastructure-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node --test --test-force-exit test/e2e-flow.test.mjs"
+  },
+  "devDependencies": {
+    "mqtt": "^5.13.3"
+  }
+}

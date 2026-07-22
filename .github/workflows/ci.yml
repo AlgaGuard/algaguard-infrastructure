@@ -1,0 +1,91 @@
+name: Infrastructure CI
+on:
+  pull_request:
+  push:
+    branches: [develop]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate Compose
+        run: docker compose --env-file .env.example config --quiet
+      - name: Validate YAML
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: .
+      - name: Shell lint
+        uses: ludeeus/action-shellcheck@master
+      - name: Secret scan
+        run: >-
+          docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.28.0
+          detect --source=/repo --no-banner --redact --exit-code=1
+      - name: Core smoke test
+        run: sh scripts/smoke.sh
+  vertical-slice:
+    needs: validate
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-access-service
+          ref: develop
+          path: _repos/algaguard-access-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-api-gateway
+          ref: develop
+          path: _repos/algaguard-api-gateway
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-command-service
+          ref: develop
+          path: _repos/algaguard-command-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-device-service
+          ref: develop
+          path: _repos/algaguard-device-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-mqtt-ingestion-service
+          ref: develop
+          path: _repos/algaguard-mqtt-ingestion-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-ota-service
+          ref: develop
+          path: _repos/algaguard-ota-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-profile-service
+          ref: develop
+          path: _repos/algaguard-profile-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-realtime-service
+          ref: develop
+          path: _repos/algaguard-realtime-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-telemetry-service
+          ref: develop
+          path: _repos/algaguard-telemetry-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-web-dashboard
+          ref: develop
+          path: _repos/algaguard-web-dashboard
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Development vertical slice
+        env:
+          ALGAGUARD_REPOS_ROOT: ./_repos
+        run: sh scripts/e2e.sh

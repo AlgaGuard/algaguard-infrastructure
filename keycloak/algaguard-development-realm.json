@@ -1,0 +1,37 @@
+{
+  "realm": "algaguard",
+  "enabled": true,
+  "displayName": "AlgaGuard Development",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "OWNER" },
+      { "name": "ADMIN" },
+      { "name": "OPERATOR" },
+      { "name": "VIEWER" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "algaguard-web",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"]
+    },
+    {
+      "clientId": "algaguard-mobile",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["com.algaguard.mobile:/oauthredirect"]
+    },
+    {
+      "clientId": "algaguard-e2e",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "users": []
+}

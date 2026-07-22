@@ -1,0 +1,137 @@
+x-node-service: &node-service
+  restart: unless-stopped
+  environment: &node-environment
+    NODE_ENV: development
+    PORT: 3000
+    DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
+    REDIS_URL: redis://redis:6379
+    LOG_LEVEL: info
+  depends_on: &node-dependencies
+    timescaledb:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  healthcheck: &node-healthcheck
+    test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health/ready"]
+    interval: 10s
+    timeout: 5s
+    retries: 20
+  networks: [backend]
+
+services:
+  access-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-access-service
+    ports: ["3001:3000"]
+
+  device-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-device-service
+    environment:
+      <<: *node-environment
+      ACCESS_SERVICE_URL: http://access-service:3000
+      ALLOW_DEVELOPMENT_CREDENTIALS: "true"
+    ports: ["3002:3000"]
+    depends_on:
+      <<: *node-dependencies
+      access-service:
+        condition: service_healthy
+
+  profile-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-profile-service
+    ports: ["3003:3000"]
+
+  telemetry-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-telemetry-service
+    ports: ["3005:3000"]
+
+  mqtt-ingestion-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-mqtt-ingestion-service
+    environment:
+      <<: *node-environment
+      MQTT_URL: mqtt://emqx:1883
+      TELEMETRY_SERVICE_URL: http://telemetry-service:3000
+    ports: ["3004:3000"]
+    depends_on:
+      <<: *node-dependencies
+      emqx:
+        condition: service_healthy
+      telemetry-service:
+        condition: service_healthy
+
+  command-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-command-service
+    environment:
+      <<: *node-environment
+      MQTT_URL: mqtt://emqx:1883
+    ports: ["3006:3000"]
+    depends_on:
+      <<: *node-dependencies
+      emqx:
+        condition: service_healthy
+
+  ota-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-ota-service
+    environment:
+      <<: *node-environment
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: algaguard-ota-development
+    ports: ["3007:3000"]
+    depends_on:
+      <<: *node-dependencies
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  realtime-service:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-realtime-service
+    environment:
+      <<: *node-environment
+      ACCESS_SERVICE_URL: http://access-service:3000
+    ports: ["3008:3000"]
+    depends_on:
+      <<: *node-dependencies
+      access-service:
+        condition: service_healthy
+
+  api-gateway:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-api-gateway
+    environment:
+      <<: *node-environment
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
+      KEYCLOAK_AUDIENCE: algaguard-api
+    ports: ["3000:3000"]
+    depends_on:
+      <<: *node-dependencies
+      keycloak:
+        condition: service_healthy
+      access-service:
+        condition: service_healthy
+      device-service:
+        condition: service_healthy
+      profile-service:
+        condition: service_healthy
+      telemetry-service:
+        condition: service_healthy
+      command-service:
+        condition: service_healthy
+      ota-service:
+        condition: service_healthy
+      realtime-service:
+        condition: service_healthy
+
+  web-dashboard:
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-web-dashboard
+    restart: unless-stopped
+    ports: ["5173:80"]
+    networks: [backend]
