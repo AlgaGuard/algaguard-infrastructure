@@ -1,0 +1,2 @@
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+CREATE DATABASE keycloak;
