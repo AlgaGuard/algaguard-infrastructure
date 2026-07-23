@@ -1,0 +1,69 @@
+mqtt {
+  peer_cert_as_clientid = disabled
+  peer_cert_as_username = pem
+  max_packet_size = 256KB
+  max_inflight = 32
+  retry_interval = 30s
+  session_expiry_interval = 1h
+  keepalive_multiplier = 1.5
+}
+
+listeners.tcp.default {
+  enable = false
+}
+
+listeners.ws.default {
+  enable = false
+}
+
+listeners.ssl.default {
+  enable = false
+}
+
+listeners.wss.default {
+  enable = false
+}
+
+listeners.ssl.device {
+  bind = "0.0.0.0:8883"
+  enable_authn = quick_deny_anonymous
+  max_connections = 10000
+  max_conn_rate = "200/s"
+  ssl_options {
+    cacertfile = "/opt/emqx/etc/algaguard-pki/device-ca/ca.crt"
+    certfile = "/opt/emqx/etc/algaguard-pki/emqx/tls.crt"
+    keyfile = "/opt/emqx/etc/algaguard-pki/emqx/tls.key"
+    verify = verify_peer
+    fail_if_no_peer_cert = true
+    versions = ["tlsv1.3", "tlsv1.2"]
+  }
+}
+
+listeners.ssl.internal {
+  bind = "0.0.0.0:8884"
+  enable_authn = false
+  max_connections = 1000
+  max_conn_rate = "100/s"
+  ssl_options {
+    cacertfile = "/opt/emqx/etc/algaguard-pki/service-ca/ca.crt"
+    certfile = "/opt/emqx/etc/algaguard-pki/emqx/tls.crt"
+    keyfile = "/opt/emqx/etc/algaguard-pki/emqx/tls.key"
+    verify = verify_peer
+    fail_if_no_peer_cert = true
+    versions = ["tlsv1.3", "tlsv1.2"]
+  }
+}
+
+authorization {
+  no_match = deny
+  deny_action = ignore
+  cache {
+    max_size = 32
+    ttl = 5s
+  }
+  sources = [{
+    type = file
+    enable = true
+    path = "/opt/emqx/etc/acl.conf"
+  }]
+}
