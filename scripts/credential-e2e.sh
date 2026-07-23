@@ -79,12 +79,32 @@ compose run --rm --no-deps --entrypoint sh command-service -c \
   'test -r /run/algaguard-pki/device-ca/ca.crt &&
    test -r /run/algaguard-pki/services/algaguard-command-service/tls.crt &&
    test -r /run/algaguard-pki/services/algaguard-command-service/tls.key'
-compose exec -T emqx sh -c \
-  'openssl s_client -brief -connect 127.0.0.1:8884 -servername emqx \
-   -CAfile /opt/emqx/etc/algaguard-pki/device-ca/ca.crt \
-   -cert /opt/emqx/etc/algaguard-pki/services/algaguard-command-service/tls.crt \
-   -key /opt/emqx/etc/algaguard-pki/services/algaguard-command-service/tls.key \
-   </dev/null >/dev/null'
+compose run --rm --no-deps --entrypoint node command-service -e '
+  const fs = require("node:fs");
+  const tls = require("node:tls");
+  const socket = tls.connect({
+    host: "emqx",
+    port: 8884,
+    servername: "emqx",
+    rejectUnauthorized: true,
+    ca: fs.readFileSync("/run/algaguard-pki/device-ca/ca.crt"),
+    cert: fs.readFileSync("/run/algaguard-pki/services/algaguard-command-service/tls.crt"),
+    key: fs.readFileSync("/run/algaguard-pki/services/algaguard-command-service/tls.key")
+  });
+  const timeout = setTimeout(() => socket.destroy(new Error("internal MQTT TLS preflight timed out")), 10000);
+  socket.once("secureConnect", () => {
+    clearTimeout(timeout);
+    if (!socket.authorized) {
+      socket.destroy(new Error(`internal MQTT TLS preflight unauthorized: ${socket.authorizationError}`));
+      return;
+    }
+    socket.end();
+  });
+  socket.once("error", (error) => {
+    clearTimeout(timeout);
+    console.error(`Internal MQTT TLS preflight failed: ${error.code || "TLS_ERROR"}`);
+    process.exitCode = 1;
+  });'
 
 for service in \
   access-service \
