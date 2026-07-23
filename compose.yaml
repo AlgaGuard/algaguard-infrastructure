@@ -71,6 +71,30 @@ services:
       retries: 20
     networks: [backend]
 
+  emqx-pki-init:
+    image: alpine:3.21
+    user: "0:0"
+    network_mode: none
+    restart: "no"
+    entrypoint: [sh, -ec]
+    command:
+      - |
+        mkdir -p /target/device-ca /target/service-ca /target/emqx
+        cp /source/device-ca.crt /target/device-ca/ca.crt
+        cp /source/service-ca.crt /target/service-ca/ca.crt
+        cp /source/emqx.crt /target/emqx/tls.crt
+        cp /source/emqx.key /target/emqx/tls.key
+        chown -R 1000:1000 /target
+        chmod 0755 /target /target/device-ca /target/service-ca /target/emqx
+        chmod 0644 /target/device-ca/ca.crt /target/service-ca/ca.crt /target/emqx/tls.crt
+        chmod 0600 /target/emqx/tls.key
+    volumes:
+      - ./.local/pki/device-ca/ca.crt:/source/device-ca.crt:ro
+      - ./.local/pki/service-ca/ca.crt:/source/service-ca.crt:ro
+      - ./.local/pki/emqx/tls.crt:/source/emqx.crt:ro
+      - ./.local/pki/emqx/tls.key:/source/emqx.key:ro
+      - emqx-pki:/target
+
   emqx:
     image: emqx/emqx:5.8
     environment:
@@ -86,7 +110,10 @@ services:
       - emqx-data:/opt/emqx/data
       - ./emqx/base.hocon:/opt/emqx/etc/base.hocon:ro
       - ./emqx/acl.conf:/opt/emqx/etc/acl.conf:ro
-      - ./.local/pki:/opt/emqx/etc/algaguard-pki:ro
+      - emqx-pki:/opt/emqx/etc/algaguard-pki:ro
+    depends_on:
+      emqx-pki-init:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:8883:8883"
     healthcheck:
@@ -228,6 +255,7 @@ volumes:
   postgres-data:
   redis-data:
   emqx-data:
+  emqx-pki:
   minio-data:
   prometheus-data:
   loki-data:
