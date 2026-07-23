@@ -18,6 +18,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-compose up -d --build --wait
+compose build access-service device-service telemetry-service mqtt-ingestion-service realtime-service
+compose up -d --wait timescaledb redis keycloak emqx
+for service in access-service device-service telemetry-service mqtt-ingestion-service; do
+  compose run --rm --no-deps "$service" node dist/scripts/migrate.js
+done
+compose up -d --no-build --wait access-service device-service telemetry-service mqtt-ingestion-service realtime-service
 npm ci
-npm run test:e2e
+npm run test:identity

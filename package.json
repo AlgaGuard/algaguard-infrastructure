@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:e2e": "node --test --test-force-exit test/e2e-flow.test.mjs"
+    "test:e2e": "node --test --test-force-exit test/e2e-flow.test.mjs",
+    "test:identity": "node --test --test-force-exit test/device-identity-e2e.test.mjs"
   },
   "devDependencies": {
-    "mqtt": "^5.13.3"
+    "mqtt": "^5.13.3",
+    "redis": "^5.6.1"
   }
 }

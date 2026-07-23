@@ -27,6 +27,8 @@ services:
       interval: 10s
       timeout: 3s
       retries: 12
+    ports:
+      - "127.0.0.1:6379:6379"
     networks: [backend]
 
   keycloak:
@@ -39,6 +41,13 @@ services:
       KC_DB_URL: jdbc:postgresql://timescaledb:5432/keycloak
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      ALGAGUARD_ACCESS_SERVICE_SECRET: ${ALGAGUARD_ACCESS_SERVICE_SECRET}
+      ALGAGUARD_DEVICE_SERVICE_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
+      ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET: ${ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET}
+      ALGAGUARD_TELEMETRY_SERVICE_SECRET: ${ALGAGUARD_TELEMETRY_SERVICE_SECRET}
+      ALGAGUARD_REALTIME_SERVICE_SECRET: ${ALGAGUARD_REALTIME_SERVICE_SECRET}
     volumes:
       - ./keycloak/algaguard-development-realm.json:/opt/keycloak/data/import/algaguard-realm.json:ro
     ports:
@@ -67,8 +76,8 @@ services:
       - emqx-data:/opt/emqx/data
       - ./emqx/acl.conf:/opt/emqx/etc/acl.conf:ro
     ports:
-      - "11883:1883"
-      - "8883:8883"
+      - "127.0.0.1:11883:1883"
+      - "127.0.0.1:8883:8883"
     healthcheck:
       test: [CMD, /opt/emqx/bin/emqx, ctl, status]
       interval: 15s
