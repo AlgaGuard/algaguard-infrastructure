@@ -25,7 +25,7 @@ app-down:
 	$(COMPOSE) -f compose.yaml -f compose.application.yaml down
 
 e2e:
-	sh scripts/e2e.sh
+	sh scripts/credential-e2e.sh
 
 credential-e2e:
 	sh scripts/credential-e2e.sh

@@ -32,7 +32,7 @@ make pki-inspect
 
 After generating the server and service credentials above, run `make credential-e2e`. The runner deletes only the dedicated `algaguard-credential-e2e` test volumes, builds and migrates the services, and validates certificate bootstrap, wrong-CA/unknown/expired/mismatched rejection, exact device-topic ACLs, telemetry acknowledgement, realtime delivery, profile/command/OTA flows, rotation, old-certificate denial, service recovery, and revocation across a full stop/restart without deleting volumes. It records safe evidence under the ignored `.local/evidence` directory and removes containers without deleting the resulting volumes.
 
-Run the device-identity proof with `make e2e`. It builds the identity-path services, applies their explicit migrations, starts the stack, and tests Keycloak users/service clients, claim/bootstrap, canonical MQTT ingestion, UUID authorization, committed-event routing, restart persistence, ownership transfer, historical isolation, negative inputs, and duplicate replay. The script stops containers without deleting named volumes.
+`make e2e` remains as an alias for `make credential-e2e`; the authenticated credential proof replaces the older pre-authentication vertical slice. Lower-level identity regression tests remain in their owning service repositories.
 
 Application services bind only to host loopback in development. NGINX does not route the authenticated Device Service context endpoint; backend services reach it on the private Compose network with client-credentials tokens.
 
