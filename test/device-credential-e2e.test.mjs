@@ -57,6 +57,27 @@ function compose(args, capture = false) {
   });
 }
 
+function sql(statement) {
+  return compose(
+    [
+      "exec",
+      "-T",
+      "timescaledb",
+      "psql",
+      "-U",
+      "algaguard",
+      "-d",
+      "algaguard",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-qAt",
+      "-c",
+      statement,
+    ],
+    true,
+  ).trim();
+}
+
 async function responseBody(response) {
   const text = await response.text();
   if (!text) return {};
@@ -277,6 +298,17 @@ async function expectMqttRejected(options, label) {
   }
   await client.endAsync().catch(() => undefined);
   assert.fail(`${label} unexpectedly connected`);
+}
+
+async function expectSubscriptionDenied(client, topic, label) {
+  let denied = false;
+  try {
+    const grants = await client.subscribeAsync(topic, { qos: 1 });
+    denied = grants.length > 0 && grants.every((grant) => grant.qos === 128);
+  } catch {
+    denied = true;
+  }
+  assert.equal(denied, true, `${label} subscription must be denied`);
 }
 
 function mqttMessage(client, topic, predicate = () => true, timeoutMs = 12_000) {
@@ -523,6 +555,11 @@ test(
         organization.id,
         "secondary",
       );
+      const inactive = await provisionDevice(
+        user,
+        organization.id,
+        "inactive",
+      );
       const ingestionToken = await clientToken(
         "algaguard-mqtt-ingestion-service",
         "replace-with-mqtt-ingestion-service-secret",
@@ -588,13 +625,19 @@ test(
         secondary.certificatePath,
         secondary.keyPath,
       );
+      let inactiveMqtt = await connectDevice(
+        inactive.deviceId,
+        inactive.certificatePath,
+        inactive.keyPath,
+      );
       clients.add(primaryMqtt);
       clients.add(secondaryMqtt);
+      clients.add(inactiveMqtt);
       const authenticationMetrics = await json(
         `${urls.device}/internal/device-credentials/metrics`,
         { token: ingestionToken },
       );
-      assert.ok(authenticationMetrics.mtlsAccepted >= 2);
+      assert.ok(authenticationMetrics.mtlsAccepted >= 3);
       assert.ok(authenticationMetrics.credentialMismatch >= 1);
       const primaryRoot = `algaguard/v1/devices/${primary.deviceId}`;
       const secondaryRoot = `algaguard/v1/devices/${secondary.deviceId}`;
@@ -613,14 +656,27 @@ test(
       );
       let crossDenied = false;
       try {
-        const grants = await primaryMqtt.subscribeAsync(secondaryAck, {
-          qos: 1,
-        });
+        const grants = await secondaryMqtt.subscribeAsync(
+          `${primaryRoot}/telemetry/ack`,
+          {
+            qos: 1,
+          },
+        );
         crossDenied = grants.some((grant) => grant.qos === 128);
       } catch {
         crossDenied = true;
       }
       assert.equal(crossDenied, true, "cross-device subscribe must be denied");
+      for (const [topic, label] of [
+        [`${secondaryRoot}/#`, "device wildcard"],
+        [`algaguard/v1/organizations/${organization.id}/#`, "organization"],
+        ["algaguard/v1/internal/#", "internal"],
+        ["algaguard/v1/management/#", "management"],
+        ["$CONTROL/#", "broker management"],
+        ["$SYS/#", "broker system"],
+      ]) {
+        await expectSubscriptionDenied(secondaryMqtt, topic, label);
+      }
 
       const profile = await json(
         `${urls.profile}/profiles`,
@@ -676,18 +732,18 @@ test(
       assert.equal((await realtimeEvent).deviceUuid, primary.deviceUuid);
 
       const crossTelemetry = telemetryEnvelope(
-        secondary.deviceId,
+        primary.deviceId,
         1,
         profile.profileId,
       );
       let crossPublishDenied = false;
       await expectNoMqttMessage(
-        secondaryMqtt,
-        secondaryAck,
+        primaryMqtt,
+        `${primaryRoot}/telemetry/ack`,
         async () => {
           try {
-            await primaryMqtt.publishAsync(
-              `${secondaryRoot}/telemetry`,
+            await secondaryMqtt.publishAsync(
+              `${primaryRoot}/telemetry`,
               JSON.stringify(crossTelemetry),
               { qos: 1 },
             );
@@ -701,6 +757,7 @@ test(
         true,
         "cross-device publish must receive MQTT Not authorized",
       );
+
       mark("telemetry_acl_realtime_ms");
 
       const commandId = randomUUID();
@@ -840,6 +897,43 @@ test(
         { qos: 1 },
       );
       mark("ota_ms");
+
+      await secondaryMqtt.endAsync();
+      clients.delete(secondaryMqtt);
+      const compromised = await json(
+        `${urls.device}/devices/${secondary.deviceUuid}/credentials/${secondary.credential.credentialId}/revocation`,
+        {
+          method: "POST",
+          token: user.token,
+          body: JSON.stringify({ reason: "COMPROMISED" }),
+        },
+      );
+      assert.equal(compromised.status, "COMPROMISED");
+      await new Promise((resolve) => setTimeout(resolve, 6_000));
+      await expectMqttRejected(
+        mqttOptions(
+          secondary.deviceId,
+          secondary.certificatePath,
+          secondary.keyPath,
+        ),
+        "compromised credential",
+      );
+
+      await inactiveMqtt.endAsync();
+      clients.delete(inactiveMqtt);
+      sql(
+        `UPDATE devices SET lifecycle='INACTIVE' WHERE device_uuid='${inactive.deviceUuid}'`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 6_000));
+      await expectMqttRejected(
+        mqttOptions(
+          inactive.deviceId,
+          inactive.certificatePath,
+          inactive.keyPath,
+        ),
+        "credential belonging to inactive device",
+      );
+      mark("negative_credential_state_ms");
 
       const rotation = await json(
         `${urls.device}/devices/${primary.deviceUuid}/credential-rotations`,
@@ -1047,8 +1141,12 @@ test(
         completedAt: new Date().toISOString(),
         composeProject:
           process.env.COMPOSE_PROJECT_NAME ?? "algaguard-credential-e2e",
-        deviceIds: [primary.deviceId, secondary.deviceId],
-        deviceUuids: [primary.deviceUuid, secondary.deviceUuid],
+        deviceIds: [primary.deviceId, secondary.deviceId, inactive.deviceId],
+        deviceUuids: [
+          primary.deviceUuid,
+          secondary.deviceUuid,
+          inactive.deviceUuid,
+        ],
         initialFingerprintPrefix:
           primary.credential.fingerprintSha256.slice(0, 12),
         replacementFingerprintPrefix:
@@ -1080,6 +1178,9 @@ test(
           identityMismatchRejected: true,
           crossDeviceSubscribeDenied: true,
           crossDevicePublishDenied: true,
+          wildcardAndPrivilegedNamespacesDenied: true,
+          compromisedCredentialRejected: true,
+          inactiveDeviceCredentialRejected: true,
           telemetryAcknowledged: true,
           realtimeDelivered: true,
           profileAssigned: true,

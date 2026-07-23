@@ -95,14 +95,14 @@ compose run --rm --no-deps --entrypoint node command-service -e '
   socket.once("secureConnect", () => {
     clearTimeout(timeout);
     if (!socket.authorized) {
-      socket.destroy(new Error(`internal MQTT TLS preflight unauthorized: ${socket.authorizationError}`));
+      socket.destroy(new Error("internal MQTT TLS preflight unauthorized: " + socket.authorizationError));
       return;
     }
     socket.end();
   });
   socket.once("error", (error) => {
     clearTimeout(timeout);
-    console.error(`Internal MQTT TLS preflight failed: ${error.code || "TLS_ERROR"}`);
+    console.error("Internal MQTT TLS preflight failed: " + (error.code || "TLS_ERROR"));
     process.exitCode = 1;
   });'
 
