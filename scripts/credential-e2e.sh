@@ -79,6 +79,15 @@ compose run --rm --no-deps --entrypoint sh command-service -c \
   'test -r /run/algaguard-pki/device-ca/ca.crt &&
    test -r /run/algaguard-pki/services/algaguard-command-service/tls.crt &&
    test -r /run/algaguard-pki/services/algaguard-command-service/tls.key'
+compose exec -T \
+  --user "$ALGAGUARD_RUNTIME_UID:$ALGAGUARD_RUNTIME_GID" \
+  emqx sh -c \
+  'openssl s_client -brief -verify_return_error \
+   -connect 127.0.0.1:8884 -servername emqx \
+   -CAfile /opt/emqx/etc/algaguard-pki/device-ca/ca.crt \
+   -cert /opt/emqx/etc/algaguard-pki/services/algaguard-command-service/tls.crt \
+   -key /opt/emqx/etc/algaguard-pki/services/algaguard-command-service/tls.key \
+   </dev/null'
 compose run --rm --no-deps --entrypoint node command-service -e '
   const fs = require("node:fs");
   const tls = require("node:tls");
@@ -102,7 +111,12 @@ compose run --rm --no-deps --entrypoint node command-service -e '
   });
   socket.once("error", (error) => {
     clearTimeout(timeout);
-    console.error("Internal MQTT TLS preflight failed: " + (error.code || "TLS_ERROR"));
+    console.error(
+      "Internal MQTT TLS preflight failed: " +
+      [error.code || "TLS_ERROR", error.message, error.reason]
+        .filter(Boolean)
+        .join(": ")
+    );
     process.exitCode = 1;
   });'
 
