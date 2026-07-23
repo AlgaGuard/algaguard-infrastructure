@@ -6,6 +6,8 @@ x-node-service: &node-service
     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
     REDIS_URL: redis://redis:6379
     LOG_LEVEL: info
+    KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
+    KEYCLOAK_AUDIENCE: algaguard-api
   depends_on: &node-dependencies
     timescaledb:
       condition: service_healthy
@@ -22,7 +24,13 @@ services:
   access-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-access-service
-    ports: ["3001:3000"]
+    environment:
+      <<: *node-environment
+      SERVICE_CLIENT_ID: algaguard-access-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_ACCESS_SERVICE_SECRET}
+      SERVICE_CLIENT_IDS: algaguard-device-service,algaguard-realtime-service,algaguard-telemetry-service
+      DEVICE_SERVICE_URL: http://device-service:3000
+    ports: ["127.0.0.1:3001:3000"]
 
   device-service:
     <<: *node-service
@@ -31,7 +39,10 @@ services:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
       ALLOW_DEVELOPMENT_CREDENTIALS: "true"
-    ports: ["3002:3000"]
+      SERVICE_CLIENT_ID: algaguard-device-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
+      SERVICE_CLIENT_IDS: algaguard-access-service,algaguard-mqtt-ingestion-service,algaguard-telemetry-service
+    ports: ["127.0.0.1:3002:3000"]
     depends_on:
       <<: *node-dependencies
       access-service:
@@ -40,12 +51,25 @@ services:
   profile-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-profile-service
-    ports: ["3003:3000"]
+    ports: ["127.0.0.1:3003:3000"]
 
   telemetry-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-telemetry-service
-    ports: ["3005:3000"]
+    environment:
+      <<: *node-environment
+      ACCESS_SERVICE_URL: http://access-service:3000
+      DEVICE_SERVICE_URL: http://device-service:3000
+      SERVICE_CLIENT_ID: algaguard-telemetry-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_TELEMETRY_SERVICE_SECRET}
+      SERVICE_CLIENT_IDS: algaguard-mqtt-ingestion-service
+    ports: ["127.0.0.1:3005:3000"]
+    depends_on:
+      <<: *node-dependencies
+      access-service:
+        condition: service_healthy
+      device-service:
+        condition: service_healthy
 
   mqtt-ingestion-service:
     <<: *node-service
@@ -53,13 +77,20 @@ services:
     environment:
       <<: *node-environment
       MQTT_URL: mqtt://emqx:1883
+      MQTT_USERNAME: development-ingestion
+      MQTT_PASSWORD: ${MQTT_INGESTION_PASSWORD}
       TELEMETRY_SERVICE_URL: http://telemetry-service:3000
-    ports: ["3004:3000"]
+      DEVICE_SERVICE_URL: http://device-service:3000
+      SERVICE_CLIENT_ID: algaguard-mqtt-ingestion-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET}
+    ports: ["127.0.0.1:3004:3000"]
     depends_on:
       <<: *node-dependencies
       emqx:
         condition: service_healthy
       telemetry-service:
+        condition: service_healthy
+      device-service:
         condition: service_healthy
 
   command-service:
@@ -68,7 +99,7 @@ services:
     environment:
       <<: *node-environment
       MQTT_URL: mqtt://emqx:1883
-    ports: ["3006:3000"]
+    ports: ["127.0.0.1:3006:3000"]
     depends_on:
       <<: *node-dependencies
       emqx:
@@ -83,7 +114,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: algaguard-ota-development
-    ports: ["3007:3000"]
+    ports: ["127.0.0.1:3007:3000"]
     depends_on:
       <<: *node-dependencies
       minio:
@@ -97,7 +128,9 @@ services:
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
-    ports: ["3008:3000"]
+      SERVICE_CLIENT_ID: algaguard-realtime-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_REALTIME_SERVICE_SECRET}
+    ports: ["127.0.0.1:3008:3000"]
     depends_on:
       <<: *node-dependencies
       access-service:
@@ -110,7 +143,7 @@ services:
       <<: *node-environment
       KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
       KEYCLOAK_AUDIENCE: algaguard-api
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
     depends_on:
       <<: *node-dependencies
       keycloak:
@@ -133,5 +166,5 @@ services:
   web-dashboard:
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-web-dashboard
     restart: unless-stopped
-    ports: ["5173:80"]
+    ports: ["127.0.0.1:5173:80"]
     networks: [backend]
