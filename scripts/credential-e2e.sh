@@ -47,6 +47,18 @@ for file in \
   fi
 done
 
+openssl verify -purpose sslserver \
+  -CAfile .local/pki/device-ca/ca.crt \
+  .local/pki/emqx/tls.crt >/dev/null
+for service in \
+  algaguard-mqtt-ingestion-service \
+  algaguard-command-service \
+  algaguard-ota-service; do
+  openssl verify -purpose sslclient \
+    -CAfile .local/pki/service-ca/ca.crt \
+    ".local/pki/services/$service/tls.crt" >/dev/null
+done
+
 # This named project is dedicated to the credential proof. Starting from empty
 # data volumes is intentional and scoped to that project only.
 compose down --volumes --remove-orphans
@@ -63,6 +75,16 @@ compose build \
 
 compose up -d --wait timescaledb redis keycloak minio emqx
 compose run --rm --no-deps minio-init
+compose run --rm --no-deps --entrypoint sh command-service -c \
+  'test -r /run/algaguard-pki/device-ca/ca.crt &&
+   test -r /run/algaguard-pki/services/algaguard-command-service/tls.crt &&
+   test -r /run/algaguard-pki/services/algaguard-command-service/tls.key'
+compose exec -T emqx sh -c \
+  'openssl s_client -brief -connect 127.0.0.1:8884 -servername emqx \
+   -CAfile /opt/emqx/etc/algaguard-pki/device-ca/ca.crt \
+   -cert /opt/emqx/etc/algaguard-pki/services/algaguard-command-service/tls.crt \
+   -key /opt/emqx/etc/algaguard-pki/services/algaguard-command-service/tls.key \
+   </dev/null >/dev/null'
 
 for service in \
   access-service \
