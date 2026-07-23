@@ -28,7 +28,10 @@ services:
       <<: *node-environment
       SERVICE_CLIENT_ID: algaguard-access-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_ACCESS_SERVICE_SECRET}
-      SERVICE_CLIENT_IDS: algaguard-device-service,algaguard-realtime-service,algaguard-telemetry-service
+      SERVICE_CLIENT_IDS: >-
+        algaguard-device-service,algaguard-realtime-service,
+        algaguard-telemetry-service,algaguard-profile-service,
+        algaguard-command-service,algaguard-ota-service
       DEVICE_SERVICE_URL: http://device-service:3000
     ports: ["127.0.0.1:3001:3000"]
 
@@ -38,11 +41,29 @@ services:
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
-      ALLOW_DEVELOPMENT_CREDENTIALS: "true"
+      ALLOW_DEVELOPMENT_CREDENTIALS: "false"
+      HTTP_BODY_LIMIT: ${HTTP_BODY_LIMIT}
+      DEVICE_CA_PROVIDER: local-development
+      DEVICE_CA_CERTIFICATE_PATH: /run/algaguard-pki/device-ca/ca.crt
+      DEVICE_CA_PRIVATE_KEY_PATH: /run/algaguard-pki/device-ca/ca.key
+      DEVICE_CERTIFICATE_VALIDITY_DAYS: ${DEVICE_CERTIFICATE_VALIDITY_DAYS}
+      DEVICE_BOOTSTRAP_TTL_SECONDS: ${DEVICE_BOOTSTRAP_TTL_SECONDS}
+      DEVICE_BOOTSTRAP_MAX_ATTEMPTS: ${DEVICE_BOOTSTRAP_MAX_ATTEMPTS}
+      DEVICE_ROTATION_OVERLAP_SECONDS: ${DEVICE_ROTATION_OVERLAP_SECONDS}
+      DEVICE_BROKER_HOST: localhost
+      DEVICE_BROKER_PORT: 8883
+      DEVICE_BROKER_SERVER_NAME: localhost
+      DEVICE_BROKER_KEEPALIVE_SECONDS: ${MQTT_KEEPALIVE_SECONDS}
+      DEVICE_BROKER_SESSION_EXPIRY_SECONDS: ${MQTT_SESSION_EXPIRY_SECONDS}
+      DEVICE_BROKER_AUTH_CACHE_SECONDS: ${DEVICE_BROKER_AUTH_CACHE_SECONDS}
+      DEVICE_REVOCATION_EFFECTIVE_SECONDS: ${DEVICE_REVOCATION_EFFECTIVE_SECONDS}
+      BROKER_DEVICE_AUTH_TOKEN: ${BROKER_DEVICE_AUTH_TOKEN}
       SERVICE_CLIENT_ID: algaguard-device-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
-      SERVICE_CLIENT_IDS: algaguard-access-service,algaguard-mqtt-ingestion-service,algaguard-telemetry-service
+      SERVICE_CLIENT_IDS: algaguard-access-service,algaguard-mqtt-ingestion-service,algaguard-telemetry-service,algaguard-ota-service
     ports: ["127.0.0.1:3002:3000"]
+    volumes:
+      - ./.local/pki:/run/algaguard-pki:ro
     depends_on:
       <<: *node-dependencies
       access-service:
@@ -51,7 +72,16 @@ services:
   profile-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-profile-service
+    environment:
+      <<: *node-environment
+      ACCESS_SERVICE_URL: http://access-service:3000
+      SERVICE_CLIENT_ID: algaguard-profile-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_PROFILE_SERVICE_SECRET}
     ports: ["127.0.0.1:3003:3000"]
+    depends_on:
+      <<: *node-dependencies
+      access-service:
+        condition: service_healthy
 
   telemetry-service:
     <<: *node-service
@@ -76,17 +106,32 @@ services:
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-mqtt-ingestion-service
     environment:
       <<: *node-environment
-      MQTT_URL: mqtt://emqx:1883
-      MQTT_USERNAME: development-ingestion
-      MQTT_PASSWORD: ${MQTT_INGESTION_PASSWORD}
+      HTTP_BODY_LIMIT: ${HTTP_BODY_LIMIT}
+      MQTT_URL: mqtts://emqx:8884
+      MQTT_CLIENT_ID: algaguard-mqtt-ingestion-service
+      MQTT_CA_PATH: /run/algaguard-pki/device-ca/ca.crt
+      MQTT_CERTIFICATE_PATH: /run/algaguard-pki/services/algaguard-mqtt-ingestion-service/tls.crt
+      MQTT_PRIVATE_KEY_PATH: /run/algaguard-pki/services/algaguard-mqtt-ingestion-service/tls.key
+      MQTT_SERVER_NAME: emqx
+      MQTT_MAX_PACKET_BYTES: ${MQTT_MAX_PACKET_BYTES}
+      MQTT_MAX_SAMPLES_PER_BATCH: ${MQTT_MAX_SAMPLES_PER_BATCH}
+      MQTT_QOS1_INFLIGHT: ${MQTT_QOS1_INFLIGHT}
+      MQTT_KEEPALIVE_SECONDS: ${MQTT_KEEPALIVE_SECONDS}
+      MQTT_SESSION_EXPIRY_SECONDS: ${MQTT_SESSION_EXPIRY_SECONDS}
+      MQTT_RECONNECT_DELAY_MS: ${MQTT_RECONNECT_DELAY_MS}
+      MQTT_MAX_MESSAGES_PER_SECOND: ${MQTT_MAX_MESSAGES_PER_SECOND}
       TELEMETRY_SERVICE_URL: http://telemetry-service:3000
       DEVICE_SERVICE_URL: http://device-service:3000
       SERVICE_CLIENT_ID: algaguard-mqtt-ingestion-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET}
     ports: ["127.0.0.1:3004:3000"]
+    volumes:
+      - ./.local/pki:/run/algaguard-pki:ro
     depends_on:
       <<: *node-dependencies
       emqx:
+        condition: service_healthy
+      access-service:
         condition: service_healthy
       telemetry-service:
         condition: service_healthy
@@ -98,11 +143,27 @@ services:
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-command-service
     environment:
       <<: *node-environment
-      MQTT_URL: mqtt://emqx:1883
+      MQTT_URL: mqtts://emqx:8884
+      MQTT_CLIENT_ID: algaguard-command-service
+      MQTT_CA_PATH: /run/algaguard-pki/device-ca/ca.crt
+      MQTT_CERTIFICATE_PATH: /run/algaguard-pki/services/algaguard-command-service/tls.crt
+      MQTT_PRIVATE_KEY_PATH: /run/algaguard-pki/services/algaguard-command-service/tls.key
+      MQTT_SERVER_NAME: emqx
+      MQTT_QOS1_INFLIGHT: ${MQTT_QOS1_INFLIGHT}
+      MQTT_KEEPALIVE_SECONDS: ${MQTT_KEEPALIVE_SECONDS}
+      MQTT_SESSION_EXPIRY_SECONDS: ${MQTT_SESSION_EXPIRY_SECONDS}
+      MQTT_RECONNECT_DELAY_MS: ${MQTT_RECONNECT_DELAY_MS}
+      ACCESS_SERVICE_URL: http://access-service:3000
+      SERVICE_CLIENT_ID: algaguard-command-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_COMMAND_SERVICE_SECRET}
     ports: ["127.0.0.1:3006:3000"]
+    volumes:
+      - ./.local/pki:/run/algaguard-pki:ro
     depends_on:
       <<: *node-dependencies
       emqx:
+        condition: service_healthy
+      access-service:
         condition: service_healthy
 
   ota-service:
@@ -114,13 +175,40 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: algaguard-ota-development
+      MQTT_URL: mqtts://emqx:8884
+      MQTT_CLIENT_ID: algaguard-ota-service
+      MQTT_CA_PATH: /run/algaguard-pki/device-ca/ca.crt
+      MQTT_CERTIFICATE_PATH: /run/algaguard-pki/services/algaguard-ota-service/tls.crt
+      MQTT_PRIVATE_KEY_PATH: /run/algaguard-pki/services/algaguard-ota-service/tls.key
+      MQTT_SERVER_NAME: emqx
+      MQTT_QOS1_INFLIGHT: ${MQTT_QOS1_INFLIGHT}
+      MQTT_KEEPALIVE_SECONDS: ${MQTT_KEEPALIVE_SECONDS}
+      MQTT_SESSION_EXPIRY_SECONDS: ${MQTT_SESSION_EXPIRY_SECONDS}
+      MQTT_RECONNECT_DELAY_MS: ${MQTT_RECONNECT_DELAY_MS}
+      HTTP_BODY_LIMIT_BYTES: ${OTA_HTTP_BODY_LIMIT_BYTES}
+      OTA_ASSIGNMENT_TTL_SECONDS: ${OTA_ASSIGNMENT_TTL_SECONDS}
+      OTA_DOWNLOAD_URL_TTL_SECONDS: ${OTA_DOWNLOAD_URL_TTL_SECONDS}
+      OTA_SIGNING_PUBLIC_KEY_PATH: /run/algaguard-pki/ota-signing/signing-public.pem
+      ACCESS_SERVICE_URL: http://access-service:3000
+      DEVICE_SERVICE_URL: http://device-service:3000
+      SERVICE_CLIENT_IDS: algaguard-firmware-release,algaguard-mqtt-ingestion-service
+      SERVICE_CLIENT_ID: algaguard-ota-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_OTA_SERVICE_SECRET}
     ports: ["127.0.0.1:3007:3000"]
+    volumes:
+      - ./.local/pki:/run/algaguard-pki:ro
     depends_on:
       <<: *node-dependencies
       minio:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      emqx:
+        condition: service_healthy
+      access-service:
+        condition: service_healthy
+      device-service:
+        condition: service_healthy
 
   realtime-service:
     <<: *node-service
@@ -130,6 +218,16 @@ services:
       ACCESS_SERVICE_URL: http://access-service:3000
       SERVICE_CLIENT_ID: algaguard-realtime-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_REALTIME_SERVICE_SECRET}
+      HTTP_BODY_LIMIT_BYTES: ${REALTIME_HTTP_BODY_LIMIT_BYTES}
+      WS_MAX_MESSAGE_BYTES: ${WS_MAX_MESSAGE_BYTES}
+      WS_MAX_SUBSCRIPTIONS: ${WS_MAX_SUBSCRIPTIONS}
+      WS_OUTBOUND_QUEUE_MAX: ${WS_OUTBOUND_QUEUE_MAX}
+      WS_CONNECTIONS_PER_MINUTE: ${WS_CONNECTIONS_PER_MINUTE}
+      WS_MESSAGES_PER_MINUTE: ${WS_MESSAGES_PER_MINUTE}
+      WS_HEARTBEAT_MS: ${WS_HEARTBEAT_MS}
+      WS_IDLE_TIMEOUT_MS: ${WS_IDLE_TIMEOUT_MS}
+      WS_BACKPRESSURE_BYTES: ${WS_BACKPRESSURE_BYTES}
+      WS_PREAUTH_BUFFER_MESSAGES: ${WS_PREAUTH_BUFFER_MESSAGES}
     ports: ["127.0.0.1:3008:3000"]
     depends_on:
       <<: *node-dependencies

@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "test:e2e": "node --test --test-force-exit test/e2e-flow.test.mjs",
-    "test:identity": "node --test --test-force-exit test/device-identity-e2e.test.mjs"
+    "test:identity": "node --test --test-force-exit test/device-identity-e2e.test.mjs",
+    "test:pki": "node --test test/pki.test.mjs",
+    "test:credential": "node --test --test-force-exit test/device-credential-e2e.test.mjs"
   },
   "devDependencies": {
+    "minio": "^8.0.7",
     "mqtt": "^5.13.3",
     "redis": "^5.6.1"
   }

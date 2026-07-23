@@ -48,6 +48,10 @@ services:
       ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET: ${ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET}
       ALGAGUARD_TELEMETRY_SERVICE_SECRET: ${ALGAGUARD_TELEMETRY_SERVICE_SECRET}
       ALGAGUARD_REALTIME_SERVICE_SECRET: ${ALGAGUARD_REALTIME_SERVICE_SECRET}
+      ALGAGUARD_PROFILE_SERVICE_SECRET: ${ALGAGUARD_PROFILE_SERVICE_SECRET}
+      ALGAGUARD_COMMAND_SERVICE_SECRET: ${ALGAGUARD_COMMAND_SERVICE_SECRET}
+      ALGAGUARD_OTA_SERVICE_SECRET: ${ALGAGUARD_OTA_SERVICE_SECRET}
+      ALGAGUARD_FIRMWARE_RELEASE_SECRET: ${ALGAGUARD_FIRMWARE_RELEASE_SECRET}
     volumes:
       - ./keycloak/algaguard-development-realm.json:/opt/keycloak/data/import/algaguard-realm.json:ro
     ports:
@@ -71,12 +75,19 @@ services:
     image: emqx/emqx:5.8
     environment:
       EMQX_NAME: algaguard-emqx
-      EMQX_AUTHORIZATION__NO_MATCH: deny
+      EMQX_NODE__COOKIE: ${EMQX_NODE_COOKIE}
+      EMQX_LISTENERS__SSL__DEVICE__AUTHENTICATION: >-
+        [{mechanism = password_based, backend = http, method = post,
+        url = "http://device-service:3000/v1/internal/device-credentials/authenticate",
+        headers = {"content-type" = "application/json", "authorization" = "Bearer ${BROKER_DEVICE_AUTH_TOKEN}"},
+        body = {clientId = "$${clientid}", certificatePem = "$${username}"},
+        connect_timeout = 5s, request_timeout = 5s, pool_size = 8, enable = true}]
     volumes:
       - emqx-data:/opt/emqx/data
+      - ./emqx/base.hocon:/opt/emqx/etc/base.hocon:ro
       - ./emqx/acl.conf:/opt/emqx/etc/acl.conf:ro
+      - ./.local/pki:/opt/emqx/etc/algaguard-pki:ro
     ports:
-      - "127.0.0.1:11883:1883"
       - "127.0.0.1:8883:8883"
     healthcheck:
       test: [CMD, /opt/emqx/bin/emqx, ctl, status]
@@ -93,6 +104,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - minio-data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
     healthcheck:
       test: [CMD, curl, -f, http://localhost:9000/minio/health/live]
       interval: 10s

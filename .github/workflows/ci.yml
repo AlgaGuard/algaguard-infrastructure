@@ -13,6 +13,15 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - name: Validate Compose
         run: docker compose --env-file .env.example config --quiet
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Validate development PKI tooling
+        run: |
+          npm ci
+          npm run test:pki
+          git check-ignore --no-index --quiet .local/pki/device-ca/ca.key
       - name: Validate YAML
         uses: ibiqlik/action-yamllint@v3
         with:
@@ -89,3 +98,66 @@ jobs:
         env:
           ALGAGUARD_REPOS_ROOT: ./_repos
         run: sh scripts/e2e.sh
+
+  device-credential-e2e:
+    needs: validate
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-access-service
+          ref: develop
+          path: _repos/algaguard-access-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-command-service
+          ref: develop
+          path: _repos/algaguard-command-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-device-service
+          ref: develop
+          path: _repos/algaguard-device-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-mqtt-ingestion-service
+          ref: develop
+          path: _repos/algaguard-mqtt-ingestion-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-ota-service
+          ref: develop
+          path: _repos/algaguard-ota-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-profile-service
+          ref: develop
+          path: _repos/algaguard-profile-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-realtime-service
+          ref: develop
+          path: _repos/algaguard-realtime-service
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/algaguard-telemetry-service
+          ref: develop
+          path: _repos/algaguard-telemetry-service
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Initialize ephemeral development PKI
+        run: |
+          node scripts/pki.mjs init
+          node scripts/pki.mjs server-cert
+          node scripts/pki.mjs service-cert algaguard-mqtt-ingestion-service
+          node scripts/pki.mjs service-cert algaguard-command-service
+          node scripts/pki.mjs service-cert algaguard-ota-service
+          node scripts/pki.mjs ota-signing-key
+      - name: Fresh-volume authenticated credential E2E
+        env:
+          ALGAGUARD_REPOS_ROOT: ./_repos
+        run: sh scripts/credential-e2e.sh
