@@ -1,5 +1,6 @@
 x-node-service: &node-service
   restart: unless-stopped
+  user: "${ALGAGUARD_RUNTIME_UID:-1000}:${ALGAGUARD_RUNTIME_GID:-1000}"
   environment: &node-environment
     NODE_ENV: development
     PORT: 3000

@@ -3,6 +3,15 @@ set -eu
 
 export COMPOSE_PROJECT_NAME=algaguard-credential-e2e
 
+# Private development keys remain mode 0600. On POSIX, run application
+# containers as the invoking user so bind-mounted keys stay readable only by
+# their owner instead of weakening their permissions.
+if command -v id >/dev/null 2>&1; then
+  ALGAGUARD_RUNTIME_UID=${ALGAGUARD_RUNTIME_UID:-$(id -u)}
+  ALGAGUARD_RUNTIME_GID=${ALGAGUARD_RUNTIME_GID:-$(id -g)}
+  export ALGAGUARD_RUNTIME_UID ALGAGUARD_RUNTIME_GID
+fi
+
 compose() {
   docker compose --env-file .env.example -f compose.yaml -f compose.application.yaml "$@"
 }
