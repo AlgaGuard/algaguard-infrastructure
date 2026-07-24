@@ -1,0 +1,63 @@
+name: Development deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_manifest:
+        description: Immutable GHCR image manifest or commit SHA to deploy
+        required: true
+        type: string
+      rollback_manifest:
+        description: Optional previously verified immutable manifest for rollback
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  packages: read
+
+jobs:
+  deploy:
+    name: Controlled development deployment
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate requested immutable manifest
+        env:
+          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
+          ROLLBACK_MANIFEST: ${{ inputs.rollback_manifest }}
+        run: |
+          test -n "$IMAGE_MANIFEST"
+          test "$IMAGE_MANIFEST" != "latest"
+          test "$ROLLBACK_MANIFEST" != "latest"
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEVELOPMENT_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Verify the approved SSM development host
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          test -n "$INSTANCE_ID"
+          aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" --query 'InstanceInformationList[0].PingStatus' --output text | grep -qx Online
+      - name: Request the host-side controlled deployment
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
+          ROLLBACK_MANIFEST: ${{ inputs.rollback_manifest }}
+        run: |
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "AlgaGuard development deployment" \
+            --parameters "commands=[\"/opt/algaguard/bin/deploy-development --manifest '$IMAGE_MANIFEST' --rollback-manifest '$ROLLBACK_MANIFEST'\"]" \
+            --query 'Command.CommandId' --output text > command-id.txt
+          echo "SSM command requested: $(cat command-id.txt)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Deployment summary
+        run: |
+          echo "Manifest: \`${{ inputs.image_manifest }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rollback manifest: \`${{ inputs.rollback_manifest || 'none' }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Host-side script must validate images, run migrations, wait for health, and run smoke checks before success." >> "$GITHUB_STEP_SUMMARY"
