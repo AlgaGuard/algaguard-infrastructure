@@ -481,7 +481,7 @@ async function expectRealtimeSubscriptionDenied(socket, deviceUuid) {
         {
           resourceType: "device",
           resourceId: deviceUuid,
-          events: ["telemetry.updated", "command.updated", "ota.updated"],
+          events: ["telemetry.updated"],
         },
       ],
     }),
