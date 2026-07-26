@@ -7,7 +7,9 @@ x-node-service: &node-service
     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
     REDIS_URL: redis://redis:6379
     LOG_LEVEL: info
-    KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
+    KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_URL}/realms/algaguard
+    KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/algaguard/protocol/openid-connect/certs
+    KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/algaguard/protocol/openid-connect/token
     KEYCLOAK_AUDIENCE: algaguard-api
   depends_on: &node-dependencies
     timescaledb:
@@ -247,7 +249,7 @@ services:
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-api-gateway
     environment:
       <<: *node-environment
-      KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
+      KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_URL}/realms/algaguard
       KEYCLOAK_AUDIENCE: algaguard-api
     ports: ["127.0.0.1:3000:3000"]
     depends_on:

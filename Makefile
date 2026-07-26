@@ -1,7 +1,7 @@
 ENV_FILE ?= .env
 COMPOSE = docker compose --env-file $(ENV_FILE)
 
-.PHONY: up down logs check smoke app-up app-down e2e credential-e2e pki-init pki-server-cert pki-gateway-cert pki-service-cert pki-ota-signing-key pki-device-cert pki-inspect pki-clean-dev demo-env-init demo-env-check demo-up demo-migrate demo-health demo-smoke demo-logs demo-stop demo-reset-destructive
+.PHONY: up down logs check smoke app-up app-down e2e credential-e2e pki-init pki-server-cert pki-gateway-cert pki-service-cert pki-ota-signing-key pki-device-cert pki-inspect pki-clean-dev demo-env-init demo-env-check demo-up demo-migrate demo-health demo-seed demo-smoke demo-logs demo-stop demo-reset-destructive
 
 up:
 	$(COMPOSE) up -d
@@ -73,6 +73,9 @@ demo-migrate:
 
 demo-health:
 	node scripts/demo-health.mjs
+
+demo-seed:
+	node scripts/demo-seed.mjs --confirm-development
 
 demo-smoke:
 	node scripts/demo-smoke.mjs
