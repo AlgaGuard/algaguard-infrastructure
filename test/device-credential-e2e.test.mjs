@@ -820,7 +820,7 @@ test(
       traceDelivery("T11", traceContext);
       assert.equal((await realtimeEvent).deviceUuid, primary.deviceUuid);
       await json(
-        `${urls.telemetry}/devices/${primary.deviceId}/latest`,
+        `${urls.telemetry}/devices/${primary.deviceUuid}/latest`,
         { token: unauthorizedUser.token },
         403,
       );
