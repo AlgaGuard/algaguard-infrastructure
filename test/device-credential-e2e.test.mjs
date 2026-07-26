@@ -21,6 +21,7 @@ const urls = {
   access: "http://127.0.0.1:3001/v1",
   device: "http://127.0.0.1:3002/v1",
   profile: "http://127.0.0.1:3003/v1",
+  telemetry: "http://127.0.0.1:3005/v1",
   command: "http://127.0.0.1:3006/v1",
   ota: "http://127.0.0.1:3007/v1",
   realtime: "http://127.0.0.1:3008/v1",
@@ -465,6 +466,33 @@ async function subscribeRealtime(socket, deviceUuid, context) {
   traceDelivery("T4", context);
 }
 
+async function expectRealtimeSubscriptionDenied(socket, deviceUuid) {
+  const requestId = randomUUID();
+  const acknowledgement = websocketMessage(
+    socket,
+    (value) => value.requestId === requestId && Array.isArray(value.rejected),
+    "UNAUTHORIZED_ORGANIZATION_SUBSCRIPTION_DENIED",
+  );
+  socket.send(
+    JSON.stringify({
+      schema: "algaguard.websocket.subscribe",
+      schemaVersion: "1.0.0",
+      requestId,
+      subscriptions: [
+        {
+          resourceType: "device",
+          resourceId: deviceUuid,
+          events: ["telemetry.updated"],
+        },
+      ],
+    }),
+  );
+  const value = await acknowledgement;
+  assert.equal(value.accepted.length, 0);
+  assert.equal(value.rejected.length, 1);
+  assert.equal(value.rejected[0]?.code, "SUBSCRIPTION_FORBIDDEN");
+}
+
 async function provisionDevice(user, organizationId, label) {
   const device = await json(
     `${urls.device}/devices`,
@@ -571,6 +599,22 @@ test(
         },
         201,
       );
+      const unauthorizedUser = await createUser(
+        admin.access_token,
+        `unauthorized-${suffix}`,
+      );
+      const unauthorizedOrganization = await json(
+        `${urls.access}/organizations`,
+        {
+          method: "POST",
+          token: unauthorizedUser.token,
+          body: JSON.stringify({
+            name: `Unauthorized credential E2E ${suffix}`,
+          }),
+        },
+        201,
+      );
+      assert.notEqual(unauthorizedOrganization.id, organization.id);
       const traceContext = { correlationId, organizationId: organization.id };
       const primary = await provisionDevice(user, organization.id, "primary");
       Object.assign(traceContext, {
@@ -738,6 +782,15 @@ test(
 
       socket = await openRealtime(user.token, traceContext);
       await subscribeRealtime(socket, primary.deviceUuid, traceContext);
+      const unauthorizedSocket = await openRealtime(unauthorizedUser.token, {
+        correlationId: randomUUID(),
+        organizationId: unauthorizedOrganization.id,
+      });
+      await expectRealtimeSubscriptionDenied(
+        unauthorizedSocket,
+        primary.deviceUuid,
+      );
+      unauthorizedSocket.close(1000, "unauthorized subscription denied");
       const realtimeEvent = websocketMessage(
         socket,
         (value) =>
@@ -766,6 +819,11 @@ test(
       assert.equal(ack.deviceId, primary.deviceId);
       traceDelivery("T11", traceContext);
       assert.equal((await realtimeEvent).deviceUuid, primary.deviceUuid);
+      await json(
+        `${urls.telemetry}/devices/${primary.deviceUuid}/latest`,
+        { token: unauthorizedUser.token },
+        403,
+      );
       traceDelivery("T16", traceContext);
 
       const crossTelemetry = telemetryEnvelope(
