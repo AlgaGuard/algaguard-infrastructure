@@ -21,6 +21,7 @@ const urls = {
   access: "http://127.0.0.1:3001/v1",
   device: "http://127.0.0.1:3002/v1",
   profile: "http://127.0.0.1:3003/v1",
+  telemetry: "http://127.0.0.1:3005/v1",
   command: "http://127.0.0.1:3006/v1",
   ota: "http://127.0.0.1:3007/v1",
   realtime: "http://127.0.0.1:3008/v1",
