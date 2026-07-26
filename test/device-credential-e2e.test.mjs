@@ -40,6 +40,20 @@ const pkiRoot = path.join(localRoot, "pki");
 const testRoot = path.join(localRoot, "credential-e2e");
 const evidenceRoot = path.join(localRoot, "evidence");
 const deviceCa = readFileSync(path.join(pkiRoot, "device-ca", "ca.crt"));
+let deliveryTrace = { stage: "T0" };
+
+function traceDelivery(stage, context = {}, outcome = "ok", reasonCode) {
+  deliveryTrace = { stage, ...context };
+  console.log(
+    `E2E_TRACE ${JSON.stringify({
+      stage,
+      ...context,
+      timestamp: new Date().toISOString(),
+      outcome,
+      ...(reasonCode ? { reasonCode } : {}),
+    })}`,
+  );
+}
 
 function openssl(args) {
   execFileSync(process.env.OPENSSL ?? "openssl", args, {
@@ -386,12 +400,13 @@ function telemetryEnvelope(deviceId, sequence, profileId, overrides = {}) {
   };
 }
 
-async function openRealtime(token) {
+async function openRealtime(token, context) {
   const ticket = await json(
     `${urls.realtime}/tickets`,
     { method: "POST", token, body: "{}" },
     201,
   );
+  traceDelivery("T1", context);
   const socket = new WebSocket(
     `ws://127.0.0.1:3008/realtime?ticket=${ticket.ticket}`,
   );
@@ -401,10 +416,11 @@ async function openRealtime(token) {
       setTimeout(() => reject(new Error("WebSocket open timed out")), 5_000),
     ),
   ]);
+  traceDelivery("T2", context);
   return socket;
 }
 
-function websocketMessage(socket, predicate, timeoutMs = 12_000) {
+function websocketMessage(socket, predicate, label, timeoutMs = 12_000) {
   return new Promise((resolve, reject) => {
     const listener = (event) => {
       const value = JSON.parse(event.data.toString());
@@ -415,17 +431,19 @@ function websocketMessage(socket, predicate, timeoutMs = 12_000) {
     };
     const timer = setTimeout(() => {
       socket.removeEventListener("message", listener);
-      reject(new Error("Timed out waiting for WebSocket event"));
+      traceDelivery(deliveryTrace.stage, deliveryTrace, "failed", label);
+      reject(new Error(`Timed out waiting for WebSocket event: ${label}`));
     }, timeoutMs);
     socket.addEventListener("message", listener);
   });
 }
 
-async function subscribeRealtime(socket, deviceUuid) {
+async function subscribeRealtime(socket, deviceUuid, context) {
   const requestId = randomUUID();
   const ack = websocketMessage(
     socket,
     (value) => value.requestId === requestId && Array.isArray(value.accepted),
+    "T4_SUBSCRIPTION_ACK",
   );
   socket.send(
     JSON.stringify({
@@ -443,6 +461,8 @@ async function subscribeRealtime(socket, deviceUuid) {
   );
   const value = await ack;
   assert.equal(value.accepted.length, 1);
+  traceDelivery("T3", context);
+  traceDelivery("T4", context);
 }
 
 async function provisionDevice(user, organizationId, label) {
@@ -527,6 +547,7 @@ test(
       timings[name] = Math.round(performance.now() - startedAt);
     };
     const suffix = `${Date.now()}-${Math.floor(Math.random() * 10_000)}`;
+    const correlationId = randomUUID();
     const clients = new Set();
     let socket;
     try {
@@ -540,6 +561,7 @@ test(
         },
       );
       const user = await createUser(admin.access_token, suffix);
+      traceDelivery("T0", { correlationId, subjectId: user.subjectId });
       const organization = await json(
         `${urls.access}/organizations`,
         {
@@ -549,7 +571,12 @@ test(
         },
         201,
       );
+      const traceContext = { correlationId, organizationId: organization.id };
       const primary = await provisionDevice(user, organization.id, "primary");
+      Object.assign(traceContext, {
+        deviceUuid: primary.deviceUuid,
+        deviceId: primary.deviceId,
+      });
       const secondary = await provisionDevice(
         user,
         organization.id,
@@ -633,6 +660,7 @@ test(
       clients.add(primaryMqtt);
       clients.add(secondaryMqtt);
       clients.add(inactiveMqtt);
+      traceDelivery("T5", traceContext);
       const authenticationMetrics = await json(
         `${urls.device}/internal/device-credentials/metrics`,
         { token: ingestionToken },
@@ -708,15 +736,21 @@ test(
       );
       assert.equal(assignment.deviceId, primary.deviceId);
 
-      socket = await openRealtime(user.token);
-      await subscribeRealtime(socket, primary.deviceUuid);
+      socket = await openRealtime(user.token, traceContext);
+      await subscribeRealtime(socket, primary.deviceUuid, traceContext);
       const realtimeEvent = websocketMessage(
         socket,
         (value) =>
           value.eventType === "telemetry.updated" &&
           value.deviceUuid === primary.deviceUuid,
+        "T16_TELEMETRY_UPDATED",
       );
       const telemetry = telemetryEnvelope(primary.deviceId, 1, profile.profileId);
+      Object.assign(traceContext, {
+        batchId: telemetry.payload.batchId,
+        firstSequence: telemetry.payload.firstSequence,
+        lastSequence: telemetry.payload.lastSequence,
+      });
       const acknowledgement = mqttMessage(
         primaryMqtt,
         `${primaryRoot}/telemetry/ack`,
@@ -727,9 +761,12 @@ test(
         JSON.stringify(telemetry),
         { qos: 1 },
       );
+      traceDelivery("T6", traceContext);
       const ack = await acknowledgement;
       assert.equal(ack.deviceId, primary.deviceId);
+      traceDelivery("T11", traceContext);
       assert.equal((await realtimeEvent).deviceUuid, primary.deviceUuid);
+      traceDelivery("T16", traceContext);
 
       const crossTelemetry = telemetryEnvelope(
         primary.deviceId,

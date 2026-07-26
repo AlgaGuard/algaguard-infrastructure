@@ -41,7 +41,7 @@ services:
       KC_DB_URL: jdbc:postgresql://timescaledb:5432/keycloak
       KC_DB_USERNAME: ${POSTGRES_USER}
       KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
-      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME: ${PUBLIC_KEYCLOAK_URL}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       ALGAGUARD_ACCESS_SERVICE_SECRET: ${ALGAGUARD_ACCESS_SERVICE_SECRET}
       ALGAGUARD_DEVICE_SERVICE_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
@@ -229,7 +229,7 @@ services:
     image: nginx:1.28-alpine
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certs:/etc/nginx/certs:ro
+      - ./.local/pki:/etc/nginx/pki:ro
     ports:
       - "8080:80"
       - "8443:443"

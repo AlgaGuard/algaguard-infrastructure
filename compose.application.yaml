@@ -7,7 +7,9 @@ x-node-service: &node-service
     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@timescaledb:5432/${POSTGRES_DB}
     REDIS_URL: redis://redis:6379
     LOG_LEVEL: info
-    KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
+    KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_URL}/realms/algaguard
+    KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/algaguard/protocol/openid-connect/certs
+    KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/algaguard/protocol/openid-connect/token
     KEYCLOAK_AUDIENCE: algaguard-api
   depends_on: &node-dependencies
     timescaledb:
@@ -25,6 +27,7 @@ services:
   access-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-access-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       SERVICE_CLIENT_ID: algaguard-access-service
@@ -39,6 +42,7 @@ services:
   device-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-device-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
@@ -73,6 +77,7 @@ services:
   profile-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-profile-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
@@ -87,6 +92,7 @@ services:
   telemetry-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-telemetry-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
@@ -105,6 +111,7 @@ services:
   mqtt-ingestion-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-mqtt-ingestion-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       HTTP_BODY_LIMIT: ${HTTP_BODY_LIMIT}
@@ -142,6 +149,7 @@ services:
   command-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-command-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       MQTT_URL: mqtts://emqx:8884
@@ -170,6 +178,7 @@ services:
   ota-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-ota-service
+    command: ["sh", "-c", "node dist/scripts/migrate.js && exec node dist/src/index.js"]
     environment:
       <<: *node-environment
       MINIO_ENDPOINT: http://minio:9000
@@ -240,7 +249,7 @@ services:
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-api-gateway
     environment:
       <<: *node-environment
-      KEYCLOAK_ISSUER: http://keycloak:8080/realms/algaguard
+      KEYCLOAK_ISSUER: ${PUBLIC_KEYCLOAK_URL}/realms/algaguard
       KEYCLOAK_AUDIENCE: algaguard-api
     ports: ["127.0.0.1:3000:3000"]
     depends_on:
@@ -263,7 +272,11 @@ services:
         condition: service_healthy
 
   web-dashboard:
-    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-web-dashboard
+    build:
+      context: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-web-dashboard
+      args:
+        VITE_API_BASE_URL: ${PUBLIC_API_URL}/v1
+        VITE_KEYCLOAK_URL: ${PUBLIC_KEYCLOAK_URL}
     restart: unless-stopped
     ports: ["127.0.0.1:5173:80"]
     networks: [backend]

@@ -166,6 +166,28 @@ function serverCertificate() {
   process.stdout.write(`Created development EMQX public certificate ${certificate}\n`);
 }
 
+function gatewayCertificate() {
+  requireDevelopmentPki();
+  const gatewayCa = path.join(root, "gateway-ca", "ca.crt");
+  if (!existsSync(gatewayCa)) createCa("gateway-ca", "AlgaGuard Development Gateway CA");
+  const hosts = (process.env.PUBLIC_TLS_HOSTS ?? "localhost,127.0.0.1")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+  if (!hosts.length || hosts.some((host) => !/^[a-zA-Z0-9.-]+$/.test(host)))
+    fail("PUBLIC_TLS_HOSTS must be a comma-separated list of DNS names or IP addresses.");
+  const subjectAltName = hosts
+    .map((host) => (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) ? `IP:${host}` : `DNS:${host}`))
+    .join(",");
+  const certificate = sign("gateway", hosts[0], "gateway-ca", [
+    "basicConstraints=critical,CA:FALSE",
+    "keyUsage=critical,digitalSignature,keyEncipherment",
+    "extendedKeyUsage=serverAuth",
+    `subjectAltName=${subjectAltName}`,
+  ]);
+  process.stdout.write(`Created development gateway certificate ${certificate}\n`);
+}
+
 function serviceCertificate(name) {
   if (!/^[a-z][a-z0-9-]{2,63}$/.test(name ?? ""))
     fail("A lowercase service name is required.");
@@ -253,6 +275,9 @@ switch (command) {
   case "server-cert":
     serverCertificate();
     break;
+  case "gateway-cert":
+    gatewayCertificate();
+    break;
   case "service-cert":
     serviceCertificate(process.argv[3]);
     break;
@@ -269,5 +294,5 @@ switch (command) {
     clean();
     break;
   default:
-    fail("Usage: pki.mjs init|server-cert|service-cert NAME|ota-signing-key|device-cert DEVICE_ID DEVICE_UUID|inspect|clean-dev --confirm");
+    fail("Usage: pki.mjs init|server-cert|gateway-cert|service-cert NAME|ota-signing-key|device-cert DEVICE_ID DEVICE_UUID|inspect|clean-dev --confirm");
 }

@@ -23,8 +23,8 @@
       "clientId": "algaguard-web",
       "publicClient": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["http://localhost:5173/*"],
-      "webOrigins": ["http://localhost:5173"]
+      "redirectUris": ["https://localhost:8443/auth/callback"],
+      "webOrigins": ["https://localhost:8443"]
     },
     {
       "clientId": "algaguard-mobile",
