@@ -29,6 +29,8 @@ const urls = {
 };
 const composePrefix = [
   "compose",
+  "--project-name",
+  process.env.COMPOSE_PROJECT_NAME ?? "algaguard-credential-e2e",
   "--env-file",
   ".env.example",
   "-f",
@@ -515,15 +517,40 @@ async function provisionDevice(user, organizationId, label) {
     },
     201,
   );
-  await json(`${urls.device}/claims/consume`, {
+  const claimed = await json(`${urls.device}/claims/consume`, {
     method: "POST",
     token: user.token,
     body: JSON.stringify({ organizationId, qr: setup }),
   });
+  assert.equal(claimed.bootstrap.deviceId, device.deviceId);
   const bootstrap = await json(
-    `${urls.device}/devices/${device.deviceUuid}/credential-bootstrap`,
-    { method: "POST", token: user.token, body: "{}" },
+    `${urls.device}/device-credential-bootstrap/exchange`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        schema:
+          "urn:algaguard:schema:onboarding:bootstrap-token-exchange-request:v1",
+        schemaVersion: "1.0.0",
+        sessionToken: claimed.bootstrap.sessionToken,
+        deviceId: device.deviceId,
+      }),
+    },
     201,
+  );
+  assert.equal(bootstrap.deviceId, device.deviceId);
+  assert.equal(bootstrap.deviceUuid, device.deviceUuid);
+  await json(
+    `${urls.device}/device-credential-bootstrap/exchange`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        schema:
+          "urn:algaguard:schema:onboarding:bootstrap-token-exchange-request:v1",
+        schemaVersion: "1.0.0",
+        sessionToken: claimed.bootstrap.sessionToken,
+      }),
+    },
+    401,
   );
   const directory = path.join(testRoot, label, "initial");
   const generated = generateCsr(directory, device.deviceId, device.deviceUuid);
@@ -553,6 +580,26 @@ async function provisionDevice(user, organizationId, label) {
   assert.equal(issuance.credential.deviceUuid, device.deviceUuid);
   assert.equal(issuance.credential.status, "ACTIVE");
   assert.equal("privateKey" in issuance, false);
+  await json(
+    `${urls.device}/device-credential-bootstrap/issue`,
+    {
+      method: "POST",
+      token: bootstrap.bootstrapToken,
+      body: JSON.stringify({
+        schema:
+          "urn:algaguard:schema:onboarding:credential-csr-submission:v1",
+        schemaVersion: "1.0.0",
+        deviceUuid: device.deviceUuid,
+        deviceId: device.deviceId,
+        purpose: "INITIAL",
+        rotationId: null,
+        idempotencyKey: randomUUID(),
+        keyAlgorithm: "EC_P256",
+        csrPem: generated.csrPem,
+      }),
+    },
+    410,
+  );
   return {
     ...device,
     certificatePath,
