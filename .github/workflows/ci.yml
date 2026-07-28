@@ -32,7 +32,8 @@ jobs:
       - name: Secret scan
         run: >-
           docker run --rm -v "${PWD}:/repo" zricethezav/gitleaks:v8.28.0
-          detect --source=/repo --no-banner --redact --exit-code=1
+          detect --source=/repo --config=/repo/.gitleaks.toml
+          --no-banner --redact --exit-code=1
       - name: Core smoke test
         run: sh scripts/smoke.sh
   device-credential-e2e:

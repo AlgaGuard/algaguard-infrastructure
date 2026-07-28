@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Immutable Git commit SHAs in the supporting image manifest"
+paths = ['''^aws/development-supporting-images\.json$''']
+regexTarget = "match"
+regexes = ['''^[0-9a-f]{40}$''']
