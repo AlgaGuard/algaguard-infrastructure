@@ -228,11 +228,11 @@ services:
   nginx:
     image: nginx:1.28-alpine
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./.local/pki:/etc/nginx/pki:ro
+      - ${NGINX_CONFIG_PATH:-./nginx/nginx.conf}:/etc/nginx/nginx.conf:ro
+      - ${NGINX_TLS_ROOT:-./.local/pki}:/etc/nginx/pki:ro
     ports:
-      - "8080:80"
-      - "8443:443"
+      - "${NGINX_HTTP_BIND_ADDRESS:-127.0.0.1}:${NGINX_HTTP_PORT:-8080}:80"
+      - "${NGINX_HTTPS_BIND_ADDRESS:-127.0.0.1}:${NGINX_HTTPS_PORT:-8443}:443"
     depends_on:
       keycloak:
         condition: service_healthy

@@ -3,66 +3,221 @@ name: Development deployment
 on:
   workflow_dispatch:
     inputs:
-      image_manifest:
-        description: Immutable GHCR image manifest or commit SHA to deploy
-        required: true
-        type: string
-      rollback_manifest:
-        description: Optional previously verified immutable manifest for rollback
-        required: false
-        type: string
+      contracts_sha: {description: Exact algaguard-contracts develop SHA, required: true, type: string}
+      device_service_sha: {description: Exact algaguard-device-service develop SHA, required: true, type: string}
+      mobile_sha: {description: Exact algaguard-mobile-app develop SHA, required: true, type: string}
+      infrastructure_sha: {description: Exact algaguard-infrastructure develop SHA, required: true, type: string}
+      firmware_sha: {description: Exact firmware feat/ble-wifi-provisioning SHA, required: true, type: string}
 
 permissions:
   contents: read
-  id-token: write
-  packages: read
 
 jobs:
-  deploy:
-    name: Controlled development deployment
+  verify-current-branches:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate requested immutable manifest
+      - name: Verify immutable branch heads
         env:
-          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
-          ROLLBACK_MANIFEST: ${{ inputs.rollback_manifest }}
+          GH_TOKEN: ${{ github.token }}
+          CONTRACTS_SHA: ${{ inputs.contracts_sha }}
+          DEVICE_SHA: ${{ inputs.device_service_sha }}
+          MOBILE_SHA: ${{ inputs.mobile_sha }}
+          INFRA_SHA: ${{ inputs.infrastructure_sha }}
+          FIRMWARE_SHA: ${{ inputs.firmware_sha }}
         run: |
-          test -n "$IMAGE_MANIFEST"
-          test "$IMAGE_MANIFEST" != "latest"
-          test "$ROLLBACK_MANIFEST" != "latest"
-      - name: Configure AWS credentials through GitHub OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+          set -euo pipefail
+          verify() {
+            repo=$1 branch=$2 expected=$3
+            test "${#expected}" -eq 40
+            actual=$(gh api "repos/AlgaGuard/$repo/git/ref/heads/$branch" --jq .object.sha)
+            test "$actual" = "$expected"
+          }
+          verify algaguard-contracts develop "$CONTRACTS_SHA"
+          verify algaguard-device-service develop "$DEVICE_SHA"
+          verify algaguard-mobile-app develop "$MOBILE_SHA"
+          verify algaguard-infrastructure develop "$INFRA_SHA"
+          verify algaguard-firmware feat/ble-wifi-provisioning "$FIRMWARE_SHA"
+
+  prepare-images:
+    needs: verify-current-branches
+    runs-on: ubuntu-latest
+    environment: development
+    outputs:
+      matrix: ${{ steps.matrix.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.infrastructure_sha }}
+      - id: matrix
+        env:
+          DEVICE_SHA: ${{ inputs.device_service_sha }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const fixed = JSON.parse(fs.readFileSync('aws/development-supporting-images.json'));
+          fixed['device-service'] = process.env.DEVICE_SHA;
+          const include = Object.entries(fixed).map(([image, sha]) => ({
+            image,
+            repo: `algaguard-${image}`,
+            sha,
+          }));
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `value=${JSON.stringify({include})}\n`);
+          NODE
+
+  build-images:
+    needs: prepare-images
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-images.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    environment: development
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: AlgaGuard/${{ matrix.repo }}
+          ref: ${{ matrix.sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEVELOPMENT_ECR_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/algaguard/${{ matrix.image }}:${{ matrix.sha }}
+          build-args: |
+            VITE_API_BASE_URL=https://api.algaguard.bosilu.dev/v1
+            VITE_KEYCLOAK_URL=https://auth.algaguard.bosilu.dev
+            VITE_WEBSOCKET_URL=wss://realtime.algaguard.bosilu.dev
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    needs: [verify-current-branches, build-images]
+    runs-on: ubuntu-latest
+    environment: development
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.infrastructure_sha }}
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEVELOPMENT_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
-      - name: Verify the approved SSM development host
+      - name: Render safe immutable release metadata
         env:
-          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+          REGION: ${{ vars.AWS_REGION }}
+          DEVICE_SHA: ${{ inputs.device_service_sha }}
+          INFRA_SHA: ${{ inputs.infrastructure_sha }}
         run: |
-          test -n "$INSTANCE_ID"
-          aws ssm describe-instance-information \
-            --filters "Key=InstanceIds,Values=$INSTANCE_ID" \
-            --query 'InstanceInformationList[0].PingStatus' \
-            --output text | grep -qx Online
-      - name: Request the host-side controlled deployment
+          set -euo pipefail
+          registry="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+          jq -r --arg device "$DEVICE_SHA" '. + {"device-service": $device} | to_entries[] | "\(.key|ascii_upcase|gsub("-";"_"))_SHA=\(.value)"' \
+            aws/development-supporting-images.json > release.env
+          cat >>release.env <<EOF
+          COMPOSE_PROJECT_NAME=algaguard-development
+          ECR_REGISTRY=$registry
+          AWS_REGION=$REGION
+          AWS_ACCOUNT_ID=$ACCOUNT_ID
+          ALGAGUARD_INFRASTRUCTURE_SHA=$INFRA_SHA
+          ALGAGUARD_DOMAIN=algaguard.bosilu.dev
+          PUBLIC_WEB_URL=https://algaguard.bosilu.dev
+          PUBLIC_API_URL=https://api.algaguard.bosilu.dev
+          PUBLIC_WSS_URL=wss://realtime.algaguard.bosilu.dev
+          PUBLIC_KEYCLOAK_URL=https://auth.algaguard.bosilu.dev
+          PUBLIC_MQTT_HOST=mqtt.algaguard.bosilu.dev
+          PUBLIC_MQTT_PORT=8883
+          PUBLIC_OTA_BASE_URL=https://api.algaguard.bosilu.dev
+          PUBLIC_TLS_HOSTS=algaguard.bosilu.dev
+          POSTGRES_DB=algaguard
+          POSTGRES_USER=algaguard
+          KEYCLOAK_ADMIN=algaguard-development-admin
+          MINIO_ROOT_USER=algaguard-development
+          GRAFANA_ADMIN_USER=algaguard-development-admin
+          ALGAGUARD_RUNTIME_UID=1000
+          ALGAGUARD_RUNTIME_GID=1000
+          HTTP_BODY_LIMIT=256kb
+          DEVICE_CERTIFICATE_VALIDITY_DAYS=90
+          DEVICE_BOOTSTRAP_TTL_SECONDS=600
+          DEVICE_BOOTSTRAP_MAX_ATTEMPTS=5
+          DEVICE_ROTATION_OVERLAP_SECONDS=300
+          DEVICE_BROKER_AUTH_CACHE_SECONDS=5
+          DEVICE_REVOCATION_EFFECTIVE_SECONDS=5
+          MQTT_MAX_PACKET_BYTES=262144
+          MQTT_MAX_SAMPLES_PER_BATCH=120
+          MQTT_QOS1_INFLIGHT=32
+          MQTT_KEEPALIVE_SECONDS=60
+          MQTT_SESSION_EXPIRY_SECONDS=3600
+          MQTT_RECONNECT_DELAY_MS=2000
+          MQTT_MAX_MESSAGES_PER_SECOND=200
+          OTA_HTTP_BODY_LIMIT_BYTES=262144
+          OTA_ASSIGNMENT_TTL_SECONDS=900
+          OTA_DOWNLOAD_URL_TTL_SECONDS=300
+          REALTIME_HTTP_BODY_LIMIT_BYTES=32768
+          WS_MAX_MESSAGE_BYTES=262144
+          WS_MAX_SUBSCRIPTIONS=50
+          WS_OUTBOUND_QUEUE_MAX=100
+          WS_CONNECTIONS_PER_MINUTE=20
+          WS_MESSAGES_PER_MINUTE=120
+          WS_HEARTBEAT_MS=30000
+          WS_IDLE_TIMEOUT_MS=90000
+          WS_BACKPRESSURE_BYTES=524288
+          WS_PREAUTH_BUFFER_MESSAGES=50
+          NGINX_CONFIG_PATH=./nginx/nginx.cloud.conf
+          NGINX_TLS_ROOT=/etc/letsencrypt
+          NGINX_HTTP_BIND_ADDRESS=0.0.0.0
+          NGINX_HTTP_PORT=80
+          NGINX_HTTPS_BIND_ADDRESS=0.0.0.0
+          NGINX_HTTPS_PORT=443
+          CERTBOT_WEBROOT=/opt/algaguard/runtime/certbot-webroot
+          EOF
+          tar -czf release.tgz \
+            compose.yaml compose.application.yaml compose.cloud.yaml release.env \
+            database emqx keycloak nginx observability scripts package.json
+      - name: Upload release bundle and deploy through SSM
         env:
+          ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+          REGION: ${{ vars.AWS_REGION }}
           INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
-          IMAGE_MANIFEST: ${{ inputs.image_manifest }}
-          ROLLBACK_MANIFEST: ${{ inputs.rollback_manifest }}
+          INFRA_SHA: ${{ inputs.infrastructure_sha }}
+          BUCKET: ${{ vars.AWS_BACKUP_BUCKET }}
         run: |
-          aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name AWS-RunShellScript \
-            --comment "AlgaGuard development deployment" \
-            --parameters \
-              "commands=[\"/opt/algaguard/bin/deploy-development --manifest '$IMAGE_MANIFEST' --rollback-manifest '$ROLLBACK_MANIFEST'\"]" \
-            --query 'Command.CommandId' --output text > command-id.txt
-          echo "SSM command requested: $(cat command-id.txt)" >> "$GITHUB_STEP_SUMMARY"
-      - name: Deployment summary
+          set -euo pipefail
+          object="deployments/$INFRA_SHA/release.tgz"
+          aws s3 cp --only-show-errors release.tgz "s3://$BUCKET/$object"
+          release="/opt/algaguard/releases/$INFRA_SHA"
+          jq -n --arg bucket "$BUCKET" --arg object "$object" --arg release "$release" \
+            --arg region "$REGION" --arg account "$ACCOUNT_ID" '{commands:[
+              "set -eu",
+              "install -d -m 0755 " + $release,
+              "aws s3 cp --only-show-errors s3://" + $bucket + "/" + $object + " /tmp/algaguard-release.tgz",
+              "tar -xzf /tmp/algaguard-release.tgz -C " + $release,
+              "chmod 0755 " + $release + "/scripts/*.sh",
+              "AWS_REGION=" + $region + " AWS_ACCOUNT_ID=" + $account + " ALGAGUARD_DOMAIN=algaguard.bosilu.dev " + $release + "/scripts/deploy-development.sh " + $release,
+              "rm -f /tmp/algaguard-release.tgz"
+            ]}' >ssm-parameters.json
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript --comment "AlgaGuard immutable development deployment" \
+            --parameters file://ssm-parameters.json --query Command.CommandId --output text)
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"
+          status=$(aws ssm get-command-invocation --command-id "$command_id" \
+            --instance-id "$INSTANCE_ID" --query Status --output text)
+          test "$status" = Success
+      - name: Public trusted HTTPS smoke tests
         run: |
-          echo "Manifest: \`${{ inputs.image_manifest }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "Rollback manifest: \`${{ inputs.rollback_manifest || 'none' }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "Host-side script must validate images, run migrations, wait for health," \
-            "and run smoke checks before success." >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 30 https://algaguard.bosilu.dev/health >/dev/null
+          curl --fail --silent --show-error --max-time 30 https://api.algaguard.bosilu.dev/health >/dev/null
+          curl --fail --silent --show-error --max-time 30 \
+            https://auth.algaguard.bosilu.dev/realms/algaguard/.well-known/openid-configuration >/dev/null

@@ -1,0 +1,36 @@
+services:
+  access-service:
+    image: ${ECR_REGISTRY}/algaguard/access-service:${ACCESS_SERVICE_SHA}
+    pull_policy: always
+  device-service:
+    image: ${ECR_REGISTRY}/algaguard/device-service:${DEVICE_SERVICE_SHA}
+    pull_policy: always
+    environment:
+      ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: "0"
+  profile-service:
+    image: ${ECR_REGISTRY}/algaguard/profile-service:${PROFILE_SERVICE_SHA}
+    pull_policy: always
+  telemetry-service:
+    image: ${ECR_REGISTRY}/algaguard/telemetry-service:${TELEMETRY_SERVICE_SHA}
+    pull_policy: always
+  mqtt-ingestion-service:
+    image: ${ECR_REGISTRY}/algaguard/mqtt-ingestion-service:${MQTT_INGESTION_SERVICE_SHA}
+    pull_policy: always
+  command-service:
+    image: ${ECR_REGISTRY}/algaguard/command-service:${COMMAND_SERVICE_SHA}
+    pull_policy: always
+  ota-service:
+    image: ${ECR_REGISTRY}/algaguard/ota-service:${OTA_SERVICE_SHA}
+    pull_policy: always
+  realtime-service:
+    image: ${ECR_REGISTRY}/algaguard/realtime-service:${REALTIME_SERVICE_SHA}
+    pull_policy: always
+  api-gateway:
+    image: ${ECR_REGISTRY}/algaguard/api-gateway:${API_GATEWAY_SHA}
+    pull_policy: always
+  web-dashboard:
+    image: ${ECR_REGISTRY}/algaguard/web-dashboard:${WEB_DASHBOARD_SHA}
+    pull_policy: always
+  nginx:
+    volumes:
+      - ${CERTBOT_WEBROOT:-./.local/certbot-webroot}:/var/www/certbot:ro

@@ -21,6 +21,7 @@ jobs:
         run: |
           npm ci
           npm run test:pki
+          npm run test:aws-demo
           git check-ignore --no-index --quiet .local/pki/device-ca/ca.key
       - name: Validate YAML
         uses: ibiqlik/action-yamllint@v3

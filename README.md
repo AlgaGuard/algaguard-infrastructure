@@ -38,5 +38,7 @@ Application services bind only to host loopback in development. NGINX does not r
 
 The supplied values are development-only placeholders. Device and service certificate paths are mounted from `.local/pki`; Compose stages only the EMQX server key and public trust certificates into a broker-owned volume so `0600` key permissions remain portable across host user IDs. CA private keys and service client keys are not exposed to the broker. Existing WSS/HTTPS certificate generation and trust-store installation are documented in [local TLS](docs/local-tls.md). No certificate private key is committed. Production CA selection remains open behind the Device Service CA interface.
 
-No AWS or campus deployment has been performed by this repository. See [deployment notes](docs/deployment-targets.md).
+The SSM-only AWS development demo foundation is documented in
+[AWS development demo](docs/aws-development-demo.md). Campus deployment remains
+deferred; see [deployment notes](docs/deployment-targets.md).
 AlgaGuard platform-first implementation repository

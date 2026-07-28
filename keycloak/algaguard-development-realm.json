@@ -2,7 +2,7 @@
   "realm": "algaguard",
   "enabled": true,
   "displayName": "AlgaGuard Development",
-  "registrationAllowed": false,
+  "registrationAllowed": true,
   "loginWithEmailAllowed": true,
   "roles": {
     "realm": [
@@ -23,8 +23,14 @@
       "clientId": "algaguard-web",
       "publicClient": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["https://localhost:8443/auth/callback"],
-      "webOrigins": ["https://localhost:8443"]
+      "redirectUris": [
+        "https://localhost:8443/auth/callback",
+        "https://algaguard.bosilu.dev/auth/callback"
+      ],
+      "webOrigins": [
+        "https://localhost:8443",
+        "https://algaguard.bosilu.dev"
+      ]
     },
     {
       "clientId": "algaguard-mobile",
