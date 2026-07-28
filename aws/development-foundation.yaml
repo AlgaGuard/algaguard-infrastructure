@@ -140,11 +140,8 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub:
-                  - repo:AlgaGuard/algaguard-contracts:environment:development
-                  - repo:AlgaGuard/algaguard-device-service:environment:development
-                  - repo:AlgaGuard/algaguard-mobile-app:environment:development
-                  - repo:AlgaGuard/algaguard-infrastructure:environment:development
+                token.actions.githubusercontent.com:sub: >-
+                  repo:AlgaGuard@305754636/algaguard-infrastructure@1309235705:environment:development
       Policies:
         - PolicyName: PushAlgaGuardImages
           PolicyDocument:
@@ -179,7 +176,8 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: repo:AlgaGuard/algaguard-infrastructure:environment:development
+                token.actions.githubusercontent.com:sub: >-
+                  repo:AlgaGuard@305754636/algaguard-infrastructure@1309235705:environment:development
       Policies:
         - PolicyName: DeployTaggedInstance
           PolicyDocument:

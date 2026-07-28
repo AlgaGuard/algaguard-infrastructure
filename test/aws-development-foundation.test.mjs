@@ -21,7 +21,14 @@ test("development host exposes HTTPS and ACME only without SSH", () => {
 
 test("OIDC trust is repository and protected-environment scoped", () => {
   assert.match(template, /sts:AssumeRoleWithWebIdentity/);
-  assert.match(template, /repo:AlgaGuard\/algaguard-infrastructure:environment:development/);
+  assert.match(
+    template,
+    /repo:AlgaGuard@305754636\/algaguard-infrastructure@1309235705:environment:development/,
+  );
+  assert.doesNotMatch(
+    template,
+    /repo:AlgaGuard\/algaguard-infrastructure:environment:development/,
+  );
   assert.doesNotMatch(template, /repo:AlgaGuard\/\*:|environment:\*/);
   assert.match(workflow, /environment: development/);
 });
