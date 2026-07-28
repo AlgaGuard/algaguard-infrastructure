@@ -123,7 +123,9 @@ jobs:
         run: |
           set -euo pipefail
           registry="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-          jq -r --arg device "$DEVICE_SHA" '. + {"device-service": $device} | to_entries[] | "\(.key|ascii_upcase|gsub("-";"_"))_SHA=\(.value)"' \
+          filter='. + {"device-service": $device} | to_entries[] |
+            "\(.key|ascii_upcase|gsub("-";"_"))_SHA=\(.value)"'
+          jq -r --arg device "$DEVICE_SHA" "$filter" \
             aws/development-supporting-images.json > release.env
           cat >>release.env <<EOF
           COMPOSE_PROJECT_NAME=algaguard-development
@@ -204,7 +206,9 @@ jobs:
               "aws s3 cp --only-show-errors s3://" + $bucket + "/" + $object + " /tmp/algaguard-release.tgz",
               "tar -xzf /tmp/algaguard-release.tgz -C " + $release,
               "chmod 0755 " + $release + "/scripts/*.sh",
-              "AWS_REGION=" + $region + " AWS_ACCOUNT_ID=" + $account + " ALGAGUARD_DOMAIN=algaguard.bosilu.dev " + $release + "/scripts/deploy-development.sh " + $release,
+              ("AWS_REGION=" + $region + " AWS_ACCOUNT_ID=" + $account +
+                " ALGAGUARD_DOMAIN=algaguard.bosilu.dev " + $release +
+                "/scripts/deploy-development.sh " + $release),
               "rm -f /tmp/algaguard-release.tgz"
             ]}' >ssm-parameters.json
           command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
