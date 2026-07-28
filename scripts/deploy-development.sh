@@ -34,9 +34,11 @@ append_parameter() {
   aws ssm get-parameter --region "$region" --with-decryption \
     --name "/algaguard/development/$parameter_name" \
     --query Parameter.Value --output text >"$temporary"
-  printf '%s=' "$env_name" >>"$runtime_env"
-  tr -d '\r\n' <"$temporary" >>"$runtime_env"
-  printf '\n' >>"$runtime_env"
+  {
+    printf '%s=' "$env_name"
+    tr -d '\r\n' <"$temporary"
+    printf '\n'
+  } >>"$runtime_env"
   rm -f "$temporary"
 }
 
