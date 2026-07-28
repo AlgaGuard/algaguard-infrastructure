@@ -71,6 +71,10 @@ test("deployment preserves private-key modes while granting the runtime owner ac
     deploymentScript,
     /chown -R 1000:1000 \/opt\/algaguard\/runtime\/pki/,
   );
+  assert.match(
+    deploymentScript,
+    /install -d -m 0755 "\$release_dir\/\.local"/,
+  );
   assert.match(workflow, /for _ in \$\(seq 1 120\)/);
   assert.doesNotMatch(workflow, /aws ssm wait command-executed/);
 });

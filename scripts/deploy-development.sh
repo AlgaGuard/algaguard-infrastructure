@@ -92,6 +92,7 @@ fi
 # development runtime identity. Keep generated private material owner-readable
 # without broadening its mode beyond the PKI tool's 0600 protection.
 chown -R 1000:1000 /opt/algaguard/runtime/pki
+install -d -m 0755 "$release_dir/.local"
 rm -rf "$release_dir/.local/pki"
 ln -s /opt/algaguard/runtime/pki "$release_dir/.local/pki"
 
