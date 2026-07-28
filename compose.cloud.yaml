@@ -34,3 +34,5 @@ services:
   nginx:
     volumes:
       - ${CERTBOT_WEBROOT:-./.local/certbot-webroot}:/var/www/certbot:ro
+    healthcheck:
+      test: [CMD, wget, --spider, -q, http://127.0.0.1:8081/health]
