@@ -7,6 +7,10 @@ const workflow = readFileSync(
   ".github/workflows/development-deploy.yml",
   "utf8",
 );
+const deploymentScript = readFileSync(
+  "scripts/deploy-development.sh",
+  "utf8",
+);
 const cloudNginx = readFileSync("nginx/nginx.cloud.conf", "utf8");
 const realm = JSON.parse(
   readFileSync("keycloak/algaguard-development-realm.json", "utf8"),
@@ -60,4 +64,13 @@ test("development realm enables signup only for approved HTTPS origins", () => {
   const web = realm.clients.find((client) => client.clientId === "algaguard-web");
   assert.ok(web.redirectUris.includes("https://algaguard.bosilu.dev/auth/callback"));
   assert.ok(web.webOrigins.includes("https://algaguard.bosilu.dev"));
+});
+
+test("deployment preserves private-key modes while granting the runtime owner access", () => {
+  assert.match(
+    deploymentScript,
+    /chown -R 1000:1000 \/opt\/algaguard\/runtime\/pki/,
+  );
+  assert.match(workflow, /for _ in \$\(seq 1 120\)/);
+  assert.doesNotMatch(workflow, /aws ssm wait command-executed/);
 });

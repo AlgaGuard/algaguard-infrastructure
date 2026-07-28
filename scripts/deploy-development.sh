@@ -88,6 +88,10 @@ if [ ! -f /opt/algaguard/runtime/.pki-ready ]; then
     -w /workspace node:22-bookworm node scripts/pki.mjs ota-signing-key
   touch /opt/algaguard/runtime/.pki-ready
 fi
+# Application containers intentionally run as the fixed unprivileged 1000:1000
+# development runtime identity. Keep generated private material owner-readable
+# without broadening its mode beyond the PKI tool's 0600 protection.
+chown -R 1000:1000 /opt/algaguard/runtime/pki
 rm -rf "$release_dir/.local/pki"
 ln -s /opt/algaguard/runtime/pki "$release_dir/.local/pki"
 

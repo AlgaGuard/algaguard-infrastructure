@@ -214,9 +214,15 @@ jobs:
           command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript --comment "AlgaGuard immutable development deployment" \
             --parameters file://ssm-parameters.json --query Command.CommandId --output text)
-          aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"
-          status=$(aws ssm get-command-invocation --command-id "$command_id" \
-            --instance-id "$INSTANCE_ID" --query Status --output text)
+          status=Pending
+          for _ in $(seq 1 120); do
+            status=$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || printf Pending)
+            case "$status" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 10
+          done
           test "$status" = Success
       - name: Public trusted HTTPS smoke tests
         run: |
