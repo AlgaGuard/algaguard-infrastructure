@@ -62,6 +62,15 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
   assert.match(cloudNginx, /location = \/health \{ return 200; \}/);
   assert.match(cloudNginx, /location = \/auth\/callback/);
   assert.match(cloudNginx, /proxy_pass http:\/\/web-dashboard:80\//);
+  assert.match(cloudNginx, /proxy_intercept_errors on/);
+  assert.match(cloudNginx, /error_page 404 = @web_spa/);
+  assert.match(cloudNginx, /location @web_spa/);
+  assert.match(cloudNginx, /rewrite \^ \/ break/);
+  assert.match(cloudNginx, /"https:\/\/algaguard\.bosilu\.dev" \$http_origin/);
+  assert.match(cloudNginx, /Access-Control-Allow-Origin \$dashboard_cors_origin always/);
+  assert.match(cloudNginx, /Access-Control-Allow-Headers "Authorization, Content-Type, X-Correlation-ID"/);
+  assert.match(cloudNginx, /if \(\$request_method = OPTIONS\)/);
+  assert.doesNotMatch(cloudNginx, /Access-Control-Allow-Origin \*/);
 });
 
 test("development realm enables signup only for approved HTTPS origins", () => {
