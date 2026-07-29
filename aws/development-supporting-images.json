@@ -7,5 +7,5 @@
   "telemetry-service": "9bc78ac76d6826e350abece67057b03e96d5848e",
   "ota-service": "93da828590ec9df5fb5c29414523564d3e80dcd5",
   "mqtt-ingestion-service": "f134e248227610773f98cd2c9a69ca1f8955e96b",
-  "web-dashboard": "f602d86c610855efd2296f873300fc2acbdbd19e"
+  "web-dashboard": "48181c6b7cd78b939a6128af6c204d22be801035"
 }
