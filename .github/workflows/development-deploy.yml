@@ -87,6 +87,16 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
       - id: ecr
         uses: aws-actions/amazon-ecr-login@v2
+      - name: Configure public web dashboard endpoints
+        if: matrix.image == 'web-dashboard'
+        run: |
+          cat >.env.production <<'EOF'
+          VITE_API_BASE_URL=https://api.algaguard.bosilu.dev/v1
+          VITE_KEYCLOAK_URL=https://auth.algaguard.bosilu.dev
+          VITE_KEYCLOAK_REALM=algaguard
+          VITE_KEYCLOAK_CLIENT_ID=algaguard-web
+          VITE_WEBSOCKET_URL=wss://realtime.algaguard.bosilu.dev
+          EOF
       - uses: docker/build-push-action@v6
         with:
           context: .
