@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+systemctl disable --now sshd
+test "$(systemctl is-active sshd 2>/dev/null || true)" != "active"
+
 release_dir=${1:?release directory required}
 region=${AWS_REGION:-ap-southeast-1}
 account_id=${AWS_ACCOUNT_ID:?AWS account ID required}
@@ -138,7 +141,9 @@ fi
 "${compose[@]}" exec -T keycloak sh <<'KEYCLOAK'
 set -eu
 config=$(mktemp)
-trap 'rm -f "$config"' EXIT
+client=$(mktemp)
+updated=$(mktemp)
+trap 'rm -f "$config" "$client" "$updated"' EXIT
 /opt/keycloak/bin/kcadm.sh config credentials --config "$config" \
   --server http://127.0.0.1:8080 --realm master \
   --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
@@ -146,10 +151,24 @@ trap 'rm -f "$config"' EXIT
 client_id=$(/opt/keycloak/bin/kcadm.sh get clients --config "$config" \
   -r algaguard -q clientId=algaguard-web --fields id --format csv --noquotes)
 test -n "$client_id"
-/opt/keycloak/bin/kcadm.sh update "clients/$client_id" --config "$config" \
-  -r algaguard \
-  -s 'attributes."post.logout.redirect.uris"=https://localhost:8443/dashboard##https://algaguard.bosilu.dev/dashboard' \
-  >/dev/null
+/opt/keycloak/bin/kcadm.sh get "clients/$client_id" --config "$config" \
+  -r algaguard >"$client"
+if ! grep -Fq '"post.logout.redirect.uris"' "$client"; then
+  if grep -Fq '"attributes" : { }' "$client"; then
+    sed '0,/"attributes" : { }/s//"attributes" : { "post.logout.redirect.uris" : "https:\/\/localhost:8443\/dashboard##https:\/\/algaguard.bosilu.dev\/dashboard" }/' \
+      "$client" >"$updated"
+  else
+    grep -Fq '"attributes" : {' "$client"
+    sed '0,/"attributes" : {/s//"attributes" : {\n    "post.logout.redirect.uris" : "https:\/\/localhost:8443\/dashboard##https:\/\/algaguard.bosilu.dev\/dashboard",/' \
+      "$client" >"$updated"
+  fi
+  grep -Fq '"post.logout.redirect.uris"' "$updated"
+  /opt/keycloak/bin/kcadm.sh update "clients/$client_id" --config "$config" \
+    -r algaguard -f "$updated" >/dev/null
+fi
+/opt/keycloak/bin/kcadm.sh get "clients/$client_id" --config "$config" \
+  -r algaguard --fields attributes | \
+  grep -Fq 'https://algaguard.bosilu.dev/dashboard'
 KEYCLOAK
 
 curl --fail --silent --show-error --max-time 20 "https://$domain/health" >/dev/null

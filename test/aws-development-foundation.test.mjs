@@ -95,5 +95,9 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   assert.match(workflow, /for _ in \$\(seq 1 120\)/);
   assert.doesNotMatch(workflow, /aws ssm wait command-executed/);
   assert.match(deploymentScript, /kcadm\.sh update "clients\/\$client_id"/);
-  assert.match(deploymentScript, /trap 'rm -f "\$config"' EXIT/);
+  assert.match(deploymentScript, /-f "\$updated"/);
+  assert.match(deploymentScript, /post\.logout\.redirect\.uris/);
+  assert.match(deploymentScript, /trap 'rm -f "\$config" "\$client" "\$updated"' EXIT/);
+  assert.match(deploymentScript, /systemctl disable --now sshd/);
+  assert.match(deploymentScript, /systemctl is-active sshd/);
 });
