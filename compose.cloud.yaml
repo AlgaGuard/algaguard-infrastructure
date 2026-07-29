@@ -32,6 +32,13 @@ services:
     image: ${ECR_REGISTRY}/algaguard/web-dashboard:${WEB_DASHBOARD_SHA}
     pull_policy: always
   nginx:
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      realtime-service:
+        condition: service_healthy
+      web-dashboard:
+        condition: service_started
     volumes:
       - ${CERTBOT_WEBROOT:-./.local/certbot-webroot}:/var/www/certbot:ro
     healthcheck:

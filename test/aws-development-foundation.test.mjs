@@ -19,6 +19,11 @@ const migrationRestoreScript = readFileSync(
   "scripts/restore-development-migration.sh",
   "utf8",
 );
+const startDevelopmentScript = readFileSync(
+  "scripts/start-development.sh",
+  "utf8",
+);
+const cloudCompose = readFileSync("compose.cloud.yaml", "utf8");
 const cloudNginx = readFileSync("nginx/nginx.cloud.conf", "utf8");
 const realm = JSON.parse(
   readFileSync("keycloak/algaguard-development-realm.json", "utf8"),
@@ -72,6 +77,13 @@ test("volume downsizing uses encrypted migration backup and checked restore", ()
     deploymentScript,
     /install -m 0755 "\$release_dir\/scripts\/restore-development-migration\.sh"/,
   );
+});
+
+test("migration restart waits for application DNS dependencies before NGINX", () => {
+  assert.match(startDevelopmentScript, /--wait --wait-timeout 900/);
+  assert.match(cloudCompose, /api-gateway:\s+condition: service_healthy/);
+  assert.match(cloudCompose, /realtime-service:\s+condition: service_healthy/);
+  assert.match(cloudCompose, /web-dashboard:\s+condition: service_started/);
 });
 
 test("OIDC trust is repository and protected-environment scoped", () => {
