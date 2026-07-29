@@ -76,7 +76,10 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
 test("development realm enables signup only for approved HTTPS origins", () => {
   assert.equal(realm.registrationAllowed, true);
   const web = realm.clients.find((client) => client.clientId === "algaguard-web");
-  assert.ok(web.redirectUris.includes("https://algaguard.bosilu.dev/auth/callback"));
+  assert.deepEqual(web.redirectUris, [
+    "https://localhost:8443/*",
+    "https://algaguard.bosilu.dev/*",
+  ]);
   assert.ok(web.webOrigins.includes("https://algaguard.bosilu.dev"));
   assert.equal(
     web.attributes["post.logout.redirect.uris"],
@@ -118,6 +121,10 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   assert.match(deploymentScript, /kcadm\.sh update "clients\/\$client_id"/);
   assert.match(deploymentScript, /-f "\$updated"/);
   assert.match(deploymentScript, /post\.logout\.redirect\.uris/);
+  assert.match(
+    deploymentScript,
+    /redirectUris=\["https:\/\/localhost:8443\/\*","https:\/\/algaguard\.bosilu\.dev\/\*"\]/,
+  );
   assert.match(deploymentScript, /for public_client in algaguard-web algaguard-mobile/);
   assert.match(deploymentScript, /clients\/\$client_id\/protocol-mappers\/models/);
   assert.match(deploymentScript, /algaguard-api-audience/);

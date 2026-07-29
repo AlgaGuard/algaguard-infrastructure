@@ -24,8 +24,8 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "redirectUris": [
-        "https://localhost:8443/auth/callback",
-        "https://algaguard.bosilu.dev/auth/callback"
+        "https://localhost:8443/*",
+        "https://algaguard.bosilu.dev/*"
       ],
       "webOrigins": [
         "https://localhost:8443",

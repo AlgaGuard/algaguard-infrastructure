@@ -171,6 +171,14 @@ fi
 /opt/keycloak/bin/kcadm.sh get "clients/$client_id" --config "$config" \
   -r algaguard | \
   grep -Fq 'https://algaguard.bosilu.dev/dashboard'
+/opt/keycloak/bin/kcadm.sh update "clients/$client_id" --config "$config" \
+  -r algaguard \
+  -s 'redirectUris=["https://localhost:8443/*","https://algaguard.bosilu.dev/*"]' \
+  >/dev/null
+/opt/keycloak/bin/kcadm.sh get "clients/$client_id" --config "$config" \
+  -r algaguard >"$client"
+grep -Fq 'https://localhost:8443/*' "$client"
+grep -Fq 'https://algaguard.bosilu.dev/*' "$client"
 
 cat >"$mapper" <<'MAPPER'
 {
