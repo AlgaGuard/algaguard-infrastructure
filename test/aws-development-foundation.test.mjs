@@ -82,6 +82,18 @@ test("development realm enables signup only for approved HTTPS origins", () => {
     web.attributes["post.logout.redirect.uris"],
     "https://localhost:8443/dashboard##https://algaguard.bosilu.dev/dashboard",
   );
+  const mobile = realm.clients.find(
+    (client) => client.clientId === "algaguard-mobile",
+  );
+  for (const client of [web, mobile]) {
+    const audience = client.protocolMappers.find(
+      (mapper) => mapper.name === "algaguard-api-audience",
+    );
+    assert.equal(audience.protocolMapper, "oidc-audience-mapper");
+    assert.equal(audience.config["included.client.audience"], "algaguard-api");
+    assert.equal(audience.config["access.token.claim"], "true");
+    assert.equal(audience.config["id.token.claim"], "false");
+  }
 });
 
 test("cloud dashboard is built only with trusted public endpoints", () => {
@@ -106,8 +118,14 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   assert.match(deploymentScript, /kcadm\.sh update "clients\/\$client_id"/);
   assert.match(deploymentScript, /-f "\$updated"/);
   assert.match(deploymentScript, /post\.logout\.redirect\.uris/);
+  assert.match(deploymentScript, /for public_client in algaguard-web algaguard-mobile/);
+  assert.match(deploymentScript, /clients\/\$client_id\/protocol-mappers\/models/);
+  assert.match(deploymentScript, /algaguard-api-audience/);
   assert.doesNotMatch(deploymentScript, /--fields attributes/);
-  assert.match(deploymentScript, /trap 'rm -f "\$config" "\$client" "\$updated"' EXIT/);
+  assert.match(
+    deploymentScript,
+    /trap 'rm -f "\$config" "\$client" "\$updated" "\$mapper" "\$mappers"' EXIT/,
+  );
   assert.match(deploymentScript, /systemctl disable --now sshd/);
   assert.match(deploymentScript, /systemctl is-active sshd/);
 });

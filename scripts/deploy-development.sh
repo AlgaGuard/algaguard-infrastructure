@@ -143,7 +143,9 @@ set -eu
 config=$(mktemp)
 client=$(mktemp)
 updated=$(mktemp)
-trap 'rm -f "$config" "$client" "$updated"' EXIT
+mapper=$(mktemp)
+mappers=$(mktemp)
+trap 'rm -f "$config" "$client" "$updated" "$mapper" "$mappers"' EXIT
 /opt/keycloak/bin/kcadm.sh config credentials --config "$config" \
   --server http://127.0.0.1:8080 --realm master \
   --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
@@ -169,6 +171,33 @@ fi
 /opt/keycloak/bin/kcadm.sh get "clients/$client_id" --config "$config" \
   -r algaguard | \
   grep -Fq 'https://algaguard.bosilu.dev/dashboard'
+
+cat >"$mapper" <<'MAPPER'
+{
+  "name": "algaguard-api-audience",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-audience-mapper",
+  "consentRequired": false,
+  "config": {
+    "included.client.audience": "algaguard-api",
+    "access.token.claim": "true",
+    "id.token.claim": "false"
+  }
+}
+MAPPER
+for public_client in algaguard-web algaguard-mobile; do
+  client_id=$(/opt/keycloak/bin/kcadm.sh get clients --config "$config" \
+    -r algaguard -q "clientId=$public_client" --fields id --format csv --noquotes)
+  test -n "$client_id"
+  /opt/keycloak/bin/kcadm.sh get "clients/$client_id/protocol-mappers/models" \
+    --config "$config" -r algaguard >"$mappers"
+  if ! grep -Fq 'algaguard-api-audience' "$mappers"; then
+    /opt/keycloak/bin/kcadm.sh create "clients/$client_id/protocol-mappers/models" \
+      --config "$config" -r algaguard -f "$mapper" >/dev/null
+  fi
+  /opt/keycloak/bin/kcadm.sh get "clients/$client_id/protocol-mappers/models" \
+    --config "$config" -r algaguard | grep -Fq 'algaguard-api-audience'
+done
 KEYCLOAK
 
 curl --fail --silent --show-error --max-time 20 "https://$domain/health" >/dev/null

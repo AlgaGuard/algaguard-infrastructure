@@ -33,13 +33,37 @@
       ],
       "attributes": {
         "post.logout.redirect.uris": "https://localhost:8443/dashboard##https://algaguard.bosilu.dev/dashboard"
-      }
+      },
+      "protocolMappers": [
+        {
+          "name": "algaguard-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "algaguard-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "algaguard-mobile",
       "publicClient": true,
       "standardFlowEnabled": true,
-      "redirectUris": ["com.algaguard.mobile:/oauthredirect"]
+      "redirectUris": ["com.algaguard.mobile:/oauthredirect"],
+      "protocolMappers": [
+        {
+          "name": "algaguard-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "algaguard-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "algaguard-e2e",
