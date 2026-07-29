@@ -69,6 +69,10 @@ services:
       interval: 15s
       timeout: 5s
       retries: 20
+      # Keycloak may spend several minutes augmenting its image while the
+      # development t3.micro is under swap pressure. Do not count those
+      # expected startup probes as failures.
+      start_period: 600s
     networks: [backend]
 
   emqx-pki-init:

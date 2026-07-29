@@ -142,12 +142,12 @@ if [ -L /opt/algaguard/current ]; then previous=$(readlink -f /opt/algaguard/cur
 ln -sfn "$release_dir" /opt/algaguard/current.next
 mv -Tf /opt/algaguard/current.next /opt/algaguard/current
 
-if ! "${compose[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 600; then
+if ! "${compose[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 900; then
   if [ -n "$previous" ] && [ -d "$previous" ]; then
     ln -sfn "$previous" /opt/algaguard/current
     docker compose --env-file "$previous/.env" -f "$previous/compose.yaml" \
       -f "$previous/compose.application.yaml" -f "$previous/compose.cloud.yaml" \
-      up -d --no-build --remove-orphans --wait --wait-timeout 600
+      up -d --no-build --remove-orphans --wait --wait-timeout 900
   fi
   exit 4
 fi

@@ -23,6 +23,7 @@ const startDevelopmentScript = readFileSync(
   "scripts/start-development.sh",
   "utf8",
 );
+const compose = readFileSync("compose.yaml", "utf8");
 const cloudCompose = readFileSync("compose.cloud.yaml", "utf8");
 const cloudNginx = readFileSync("nginx/nginx.cloud.conf", "utf8");
 const realm = JSON.parse(
@@ -81,6 +82,13 @@ test("volume downsizing uses encrypted migration backup and checked restore", ()
 
 test("migration restart waits for application DNS dependencies before NGINX", () => {
   assert.match(startDevelopmentScript, /--wait --wait-timeout 900/);
+  assert.match(compose, /keycloak:[\s\S]*start_period: 600s/);
+  assert.doesNotMatch(deploymentScript, /--wait-timeout 600/);
+  assert.equal(
+    [...deploymentScript.matchAll(/--wait-timeout 900/g)].length,
+    2,
+    "deployment and rollback must both tolerate t3.micro startup latency",
+  );
   assert.match(cloudCompose, /api-gateway:\s+condition: service_healthy/);
   assert.match(cloudCompose, /realtime-service:\s+condition: service_healthy/);
   assert.match(cloudCompose, /web-dashboard:\s+condition: service_started/);
