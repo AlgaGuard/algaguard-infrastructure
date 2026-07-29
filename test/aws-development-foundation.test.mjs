@@ -103,7 +103,14 @@ test("cloud dashboard is built only with trusted public endpoints", () => {
   assert.match(workflow, /cat >\.env\.production/);
   assert.match(workflow, /VITE_API_BASE_URL=https:\/\/api\.algaguard\.bosilu\.dev\/v1/);
   assert.match(workflow, /VITE_KEYCLOAK_URL=https:\/\/auth\.algaguard\.bosilu\.dev/);
-  assert.match(workflow, /VITE_WEBSOCKET_URL=wss:\/\/realtime\.algaguard\.bosilu\.dev/);
+  assert.match(
+    workflow,
+    /VITE_WEBSOCKET_URL=wss:\/\/realtime\.algaguard\.bosilu\.dev\/realtime/,
+  );
+  assert.match(
+    workflow,
+    /PUBLIC_WSS_URL=wss:\/\/realtime\.algaguard\.bosilu\.dev\/realtime/,
+  );
   assert.doesNotMatch(workflow, /VITE_\w+=http:\/\//);
 });
 
