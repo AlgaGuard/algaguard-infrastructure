@@ -11,6 +11,14 @@ const deploymentScript = readFileSync(
   "scripts/deploy-development.sh",
   "utf8",
 );
+const migrationBackupScript = readFileSync(
+  "scripts/backup-development-migration.sh",
+  "utf8",
+);
+const migrationRestoreScript = readFileSync(
+  "scripts/restore-development-migration.sh",
+  "utf8",
+);
 const cloudNginx = readFileSync("nginx/nginx.cloud.conf", "utf8");
 const realm = JSON.parse(
   readFileSync("keycloak/algaguard-development-realm.json", "utf8"),
@@ -22,6 +30,48 @@ test("development host exposes HTTPS and ACME only without SSH", () => {
   assert.doesNotMatch(template, /FromPort: 22|ToPort: 22/);
   assert.match(template, /Encrypted: true/);
   assert.match(template, /systemctl disable --now sshd/);
+});
+
+test("development host uses the bounded free-tier compute and storage profile", () => {
+  assert.match(
+    template,
+    /InstanceType: \{Type: String, Default: t3\.micro, AllowedValues: \[t3\.micro\]\}/,
+  );
+  assert.match(
+    template,
+    /VolumeType: gp3, VolumeSize: 30, DeleteOnTermination: true/,
+  );
+  assert.doesNotMatch(template, /t3\.large|VolumeSize: 50/);
+});
+
+test("development host creates persistent two GiB swap securely", () => {
+  for (const source of [template, deploymentScript]) {
+    assert.match(source, /dd if=\/dev\/zero of=\/swapfile bs=1M count=2048/);
+    assert.match(source, /chmod 0600 \/swapfile/);
+    assert.match(source, /mkswap \/swapfile/);
+    assert.match(source, /\/swapfile none swap sw 0 0/);
+    assert.match(source, /swapon \/swapfile/);
+  }
+});
+
+test("volume downsizing uses encrypted migration backup and checked restore", () => {
+  assert.match(migrationBackupScript, /systemctl stop docker/);
+  assert.match(migrationBackupScript, /var\/lib\/docker\/volumes/);
+  assert.match(migrationBackupScript, /opt\/algaguard\/runtime\/pki/);
+  assert.match(migrationBackupScript, /etc\/letsencrypt/);
+  assert.match(migrationBackupScript, /sha256sum/);
+  assert.match(migrationBackupScript, /--sse AES256/);
+  assert.match(migrationRestoreScript, /sha256sum --check --status/);
+  assert.match(migrationRestoreScript, /rollback_state/);
+  assert.match(migrationRestoreScript, /systemctl start algaguard-development\.service/);
+  assert.match(
+    deploymentScript,
+    /install -m 0755 "\$release_dir\/scripts\/backup-development-migration\.sh"/,
+  );
+  assert.match(
+    deploymentScript,
+    /install -m 0755 "\$release_dir\/scripts\/restore-development-migration\.sh"/,
+  );
 });
 
 test("OIDC trust is repository and protected-environment scoped", () => {

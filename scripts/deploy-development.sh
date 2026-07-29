@@ -12,11 +12,25 @@ compose_version=v5.1.4
 compose_sha256=33b208d7e76639db742fae84b966cc01dacae58ca3fc4dabbc907045aefdf0c4
 compose_plugin=/usr/local/lib/docker/cli-plugins/docker-compose
 
+ensure_swap() {
+  if [ ! -f /swapfile ]; then
+    dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+    chmod 0600 /swapfile
+    mkswap /swapfile >/dev/null
+  fi
+  chmod 0600 /swapfile
+  grep -q '^/swapfile ' /etc/fstab ||
+    printf '/swapfile none swap sw 0 0\n' >>/etc/fstab
+  swapon --show=NAME --noheadings | grep -qx /swapfile || swapon /swapfile
+}
+
 case "$release_dir" in
   /opt/algaguard/releases/*) ;;
   *) echo 'Unsafe release directory.' >&2; exit 2 ;;
 esac
 test -f "$release_dir/release.env"
+
+ensure_swap
 
 install_compose() {
   if docker compose version >/dev/null 2>&1; then return; fi
@@ -230,7 +244,9 @@ UNIT
 install -m 0755 "$release_dir/scripts/start-development.sh" /opt/algaguard/bin/start-development
 install -m 0755 "$release_dir/scripts/stop-development.sh" /opt/algaguard/bin/stop-development
 install -m 0755 "$release_dir/scripts/backup-development.sh" /opt/algaguard/bin/backup-development
+install -m 0755 "$release_dir/scripts/backup-development-migration.sh" /opt/algaguard/bin/backup-development-migration
 install -m 0755 "$release_dir/scripts/verify-backup-restore.sh" /opt/algaguard/bin/verify-backup-restore
+install -m 0755 "$release_dir/scripts/restore-development-migration.sh" /opt/algaguard/bin/restore-development-migration
 install -m 0755 "$release_dir/scripts/reload-nginx.sh" /opt/algaguard/bin/reload-nginx
 cat >/etc/systemd/system/algaguard-backup.service <<'UNIT'
 [Unit]

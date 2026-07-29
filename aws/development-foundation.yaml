@@ -3,7 +3,7 @@ Description: AlgaGuard Thursday demo development foundation
 Parameters:
   VpcId: {Type: AWS::EC2::VPC::Id}
   SubnetId: {Type: AWS::EC2::Subnet::Id}
-  InstanceType: {Type: String, Default: t3.large, AllowedValues: [t3.medium, t3.large]}
+  InstanceType: {Type: String, Default: t3.micro, AllowedValues: [t3.micro]}
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
@@ -72,7 +72,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:s3:::algaguard-dev-backups-${AWS::AccountId}-${AWS::Region}
               - !Sub arn:${AWS::Partition}:s3:::algaguard-dev-backups-${AWS::AccountId}-${AWS::Region}/*
-  Instance:
+  FreeTierInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref AmiId
@@ -82,7 +82,7 @@ Resources:
       IamInstanceProfile: !Ref InstanceProfile
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
-          Ebs: {Encrypted: true, VolumeType: gp3, VolumeSize: 50, DeleteOnTermination: true}
+          Ebs: {Encrypted: true, VolumeType: gp3, VolumeSize: 30, DeleteOnTermination: true}
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -95,6 +95,15 @@ Resources:
           echo '33b208d7e76639db742fae84b966cc01dacae58ca3fc4dabbc907045aefdf0c4  /usr/local/lib/docker/cli-plugins/docker-compose' |
             sha256sum --check
           chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+          if [ ! -f /swapfile ]; then
+            dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+            chmod 0600 /swapfile
+            mkswap /swapfile >/dev/null
+          fi
+          chmod 0600 /swapfile
+          grep -q '^/swapfile ' /etc/fstab ||
+            printf '/swapfile none swap sw 0 0\n' >>/etc/fstab
+          swapon --show=NAME --noheadings | grep -qx /swapfile || swapon /swapfile
           systemctl enable --now docker amazon-ssm-agent
           systemctl disable --now sshd
           mkdir -p /opt/algaguard
@@ -117,7 +126,7 @@ Resources:
     Type: AWS::EC2::EIPAssociation
     Properties:
       AllocationId: !GetAtt ElasticIp.AllocationId
-      InstanceId: !Ref Instance
+      InstanceId: !Ref FreeTierInstance
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
     Properties:
@@ -299,7 +308,7 @@ Resources:
           "selection":{"tagStatus":"any","countType":"imageCountMoreThan",
           "countNumber":10},"action":{"type":"expire"}}]}
 Outputs:
-  InstanceId: {Value: !Ref Instance}
+  InstanceId: {Value: !Ref FreeTierInstance}
   ElasticIp: {Value: !Ref ElasticIp}
   EcrPushRoleArn: {Value: !GetAtt EcrPushRole.Arn}
   SsmDeployRoleArn: {Value: !GetAtt SsmDeployRole.Arn}

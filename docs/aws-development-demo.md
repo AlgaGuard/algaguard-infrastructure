@@ -1,10 +1,11 @@
 # AWS development demo
 
-The Thursday demo uses one SSM-managed Amazon Linux EC2 instance with encrypted
-EBS and an Elastic IP. Only ports 80 and 443 are public; SSH, databases, cache,
-admin services, and MQTT stay closed. GitHub Actions assumes exact
-repository/environment OIDC roles and deploys immutable commit-SHA images by
-SSM Run Command. Runtime secrets are read from `/algaguard/development/` in SSM.
+The Thursday demo uses one SSM-managed Amazon Linux `t3.micro` instance with a
+30 GiB encrypted gp3 root volume, a persistent 2 GiB swap file, and an Elastic
+IP. Only ports 80 and 443 are public; SSH, databases, cache, admin services, and
+MQTT stay closed. GitHub Actions assumes exact repository/environment OIDC
+roles and deploys immutable commit-SHA images by SSM Run Command. Runtime
+secrets are read from `/algaguard/development/` in SSM.
 
 The public names are `algaguard.bosilu.dev`, `api.algaguard.bosilu.dev`,
 `auth.algaguard.bosilu.dev`, and `realtime.algaguard.bosilu.dev`.
@@ -46,12 +47,36 @@ aws ssm send-command --region ap-southeast-1 --instance-ids <instance-id> `
 ```
 
 The stack is enabled at boot and Docker uses persistent encrypted EBS volumes.
+The swap file is created with mode `0600`, registered in `/etc/fstab`, and
+enabled idempotently by both first-boot and deployment scripts. Swap reduces
+the risk of an abrupt OOM kill but does not add CPU or make a 1 GiB instance
+equivalent to the former `t3.large`; health checks remain the acceptance gate.
+
 The daily backup command is `/opt/algaguard/bin/backup-development`; the
 synthetic restore proof is `/opt/algaguard/bin/verify-backup-restore`. Backups
 are encrypted and private, expire after 14 days, and noncurrent versions expire
 after 7 days.
 
-At the current Singapore on-demand price of USD 0.1056/hour for `t3.large`, 48
-running hours cost about USD 5.07 before storage, public IPv4, ECR, DNS, and
-transfer. The expected short demo total is USD 14–18; a USD 20 AWS budget alert
-is intentionally stricter than the operator's USD 200 ceiling.
+The infrastructure profile is intentionally bounded to `t3.micro` and 30 GiB,
+which are common EC2 Free Tier dimensions. Free Tier eligibility is
+account- and offer-dependent, and it is not a hard spending cap. Public IPv4,
+EBS retained after instance termination, snapshots, ECR, DNS, transfer, and
+usage after credits or eligibility expire can still incur charges. Keep the
+existing USD 20 budget alert, review Cost Explorer and Free Tier usage, and stop
+the instance when it is not needed. The Elastic IP preserves stable DNS across
+stop/start, but public IPv4 and EBS can continue to accrue charges while the
+application is stopped.
+
+The former 50 GiB root volume cannot be shrunk in place. Migration therefore
+uses a new 30 GiB encrypted root volume, an encrypted private backup, and
+health-checked data restoration. The old host or recovery artifact is removed
+only after the replacement passes public HTTPS and application checks.
+
+`/opt/algaguard/bin/backup-development-migration` briefly stops the stack and
+Docker to capture consistent Docker volumes, runtime PKI, and public TLS state.
+It uploads an AES-256 encrypted archive plus a SHA-256 checksum to the private
+backup bucket. On a replacement host,
+`/opt/algaguard/bin/restore-development-migration <object-key>` verifies the
+checksum, restores the state while Docker is stopped, and rolls back its local
+changes if extraction or service startup fails. Never use the migration archive
+as a public artifact.
