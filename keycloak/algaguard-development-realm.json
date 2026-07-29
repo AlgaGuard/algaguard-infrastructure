@@ -30,7 +30,10 @@
       "webOrigins": [
         "https://localhost:8443",
         "https://algaguard.bosilu.dev"
-      ]
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://localhost:8443/dashboard##https://algaguard.bosilu.dev/dashboard"
+      }
     },
     {
       "clientId": "algaguard-mobile",

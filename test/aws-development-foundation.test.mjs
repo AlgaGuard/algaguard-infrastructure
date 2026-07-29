@@ -69,6 +69,10 @@ test("development realm enables signup only for approved HTTPS origins", () => {
   const web = realm.clients.find((client) => client.clientId === "algaguard-web");
   assert.ok(web.redirectUris.includes("https://algaguard.bosilu.dev/auth/callback"));
   assert.ok(web.webOrigins.includes("https://algaguard.bosilu.dev"));
+  assert.equal(
+    web.attributes["post.logout.redirect.uris"],
+    "https://localhost:8443/dashboard##https://algaguard.bosilu.dev/dashboard",
+  );
 });
 
 test("cloud dashboard is built only with trusted public endpoints", () => {
@@ -90,4 +94,6 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   );
   assert.match(workflow, /for _ in \$\(seq 1 120\)/);
   assert.doesNotMatch(workflow, /aws ssm wait command-executed/);
+  assert.match(deploymentScript, /kcadm\.sh update "clients\/\$client_id"/);
+  assert.match(deploymentScript, /trap 'rm -f "\$config"' EXIT/);
 });

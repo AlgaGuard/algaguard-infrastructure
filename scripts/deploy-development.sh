@@ -135,6 +135,23 @@ if ! "${compose[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 600
   exit 4
 fi
 
+"${compose[@]}" exec -T keycloak sh <<'KEYCLOAK'
+set -eu
+config=$(mktemp)
+trap 'rm -f "$config"' EXIT
+/opt/keycloak/bin/kcadm.sh config credentials --config "$config" \
+  --server http://127.0.0.1:8080 --realm master \
+  --user "$KC_BOOTSTRAP_ADMIN_USERNAME" \
+  --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null
+client_id=$(/opt/keycloak/bin/kcadm.sh get clients --config "$config" \
+  -r algaguard -q clientId=algaguard-web --fields id --format csv --noquotes)
+test -n "$client_id"
+/opt/keycloak/bin/kcadm.sh update "clients/$client_id" --config "$config" \
+  -r algaguard \
+  -s 'attributes."post.logout.redirect.uris"=https://localhost:8443/dashboard##https://algaguard.bosilu.dev/dashboard' \
+  >/dev/null
+KEYCLOAK
+
 curl --fail --silent --show-error --max-time 20 "https://$domain/health" >/dev/null
 curl --fail --silent --show-error --max-time 20 "https://api.$domain/health" >/dev/null
 curl --fail --silent --show-error --max-time 20 "https://auth.$domain/realms/algaguard/.well-known/openid-configuration" >/dev/null
