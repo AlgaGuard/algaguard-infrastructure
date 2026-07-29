@@ -167,7 +167,7 @@ if ! grep -Fq '"post.logout.redirect.uris"' "$client"; then
     -r algaguard -f "$updated" >/dev/null
 fi
 /opt/keycloak/bin/kcadm.sh get "clients/$client_id" --config "$config" \
-  -r algaguard --fields attributes | \
+  -r algaguard | \
   grep -Fq 'https://algaguard.bosilu.dev/dashboard'
 KEYCLOAK
 

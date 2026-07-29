@@ -97,6 +97,7 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   assert.match(deploymentScript, /kcadm\.sh update "clients\/\$client_id"/);
   assert.match(deploymentScript, /-f "\$updated"/);
   assert.match(deploymentScript, /post\.logout\.redirect\.uris/);
+  assert.doesNotMatch(deploymentScript, /--fields attributes/);
   assert.match(deploymentScript, /trap 'rm -f "\$config" "\$client" "\$updated"' EXIT/);
   assert.match(deploymentScript, /systemctl disable --now sshd/);
   assert.match(deploymentScript, /systemctl is-active sshd/);
