@@ -96,6 +96,7 @@ Resources:
             sha256sum --check
           chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
           systemctl enable --now docker amazon-ssm-agent
+          systemctl disable --now sshd
           mkdir -p /opt/algaguard
           chown ec2-user:ec2-user /opt/algaguard
       Tags:

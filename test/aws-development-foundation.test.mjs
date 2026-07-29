@@ -21,6 +21,7 @@ test("development host exposes HTTPS and ACME only without SSH", () => {
   assert.match(template, /FromPort: 443, ToPort: 443/);
   assert.doesNotMatch(template, /FromPort: 22|ToPort: 22/);
   assert.match(template, /Encrypted: true/);
+  assert.match(template, /systemctl disable --now sshd/);
 });
 
 test("OIDC trust is repository and protected-environment scoped", () => {
