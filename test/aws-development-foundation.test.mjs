@@ -158,6 +158,7 @@ test("development realm enables signup only for approved HTTPS origins", () => {
   const mobile = realm.clients.find(
     (client) => client.clientId === "algaguard-mobile",
   );
+  assert.deepEqual(mobile.redirectUris, ["com.algaguard.mobile:/oauthredirect"]);
   for (const client of [web, mobile]) {
     const audience = client.protocolMappers.find(
       (mapper) => mapper.name === "algaguard-api-audience",
@@ -201,6 +202,11 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   assert.match(
     deploymentScript,
     /redirectUris=\["https:\/\/localhost:8443\/\*","https:\/\/algaguard\.bosilu\.dev\/\*"\]/,
+  );
+  assert.match(deploymentScript, /clientId=algaguard-mobile/);
+  assert.match(
+    deploymentScript,
+    /redirectUris=\["com\.algaguard\.mobile:\/oauthredirect"\]/,
   );
   assert.match(deploymentScript, /for public_client in algaguard-web algaguard-mobile/);
   assert.match(deploymentScript, /clients\/\$client_id\/protocol-mappers\/models/);

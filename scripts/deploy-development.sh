@@ -194,6 +194,22 @@ fi
 grep -Fq 'https://localhost:8443/*' "$client"
 grep -Fq 'https://algaguard.bosilu.dev/*' "$client"
 
+# Realm imports do not update existing clients. Reconcile the Android public
+# client's exact AppAuth callback so a previously created development realm
+# cannot retain stale web-only redirect settings.
+mobile_client_id=$(/opt/keycloak/bin/kcadm.sh get clients --config "$config" \
+  -r algaguard -q clientId=algaguard-mobile --fields id --format csv --noquotes)
+test -n "$mobile_client_id"
+/opt/keycloak/bin/kcadm.sh update "clients/$mobile_client_id" --config "$config" \
+  -r algaguard \
+  -s 'publicClient=true' \
+  -s 'standardFlowEnabled=true' \
+  -s 'redirectUris=["com.algaguard.mobile:/oauthredirect"]' \
+  >/dev/null
+/opt/keycloak/bin/kcadm.sh get "clients/$mobile_client_id" --config "$config" \
+  -r algaguard >"$client"
+grep -Fq 'com.algaguard.mobile:/oauthredirect' "$client"
+
 cat >"$mapper" <<'MAPPER'
 {
   "name": "algaguard-api-audience",
