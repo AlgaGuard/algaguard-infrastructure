@@ -60,6 +60,8 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
   assert.match(cloudNginx, /TLSv1\.2 TLSv1\.3/);
   assert.match(cloudNginx, /listen 127\.0\.0\.1:8081/);
   assert.match(cloudNginx, /location = \/health \{ return 200; \}/);
+  assert.match(cloudNginx, /location = \/auth\/callback/);
+  assert.match(cloudNginx, /proxy_pass http:\/\/web-dashboard:80\//);
 });
 
 test("development realm enables signup only for approved HTTPS origins", () => {
