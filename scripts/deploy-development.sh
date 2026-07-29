@@ -240,7 +240,21 @@ KEYCLOAK
 
 curl --fail --silent --show-error --max-time 20 "https://$domain/health" >/dev/null
 curl --fail --silent --show-error --max-time 20 "https://api.$domain/health" >/dev/null
-curl --fail --silent --show-error --max-time 20 "https://auth.$domain/realms/algaguard/.well-known/openid-configuration" >/dev/null
+oidc_document=$(mktemp)
+curl --fail --silent --show-error --max-time 20 \
+  "https://auth.$domain/realms/algaguard/.well-known/openid-configuration" \
+  >"$oidc_document"
+jq -e '
+  [
+    .issuer,
+    .authorization_endpoint,
+    .token_endpoint,
+    .userinfo_endpoint,
+    .end_session_endpoint,
+    .jwks_uri
+  ] | all(type == "string" and startswith("https://"))
+' "$oidc_document" >/dev/null
+rm -f "$oidc_document"
 
 cat >/etc/systemd/system/algaguard-development.service <<'UNIT'
 [Unit]

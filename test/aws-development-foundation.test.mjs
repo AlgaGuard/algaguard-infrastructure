@@ -140,7 +140,24 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
   assert.match(cloudNginx, /Access-Control-Allow-Origin \$dashboard_cors_origin always/);
   assert.match(cloudNginx, /Access-Control-Allow-Headers "Authorization, Content-Type, X-Correlation-ID"/);
   assert.match(cloudNginx, /if \(\$request_method = OPTIONS\)/);
+  assert.match(cloudNginx, /proxy_set_header X-Forwarded-Proto https/);
+  assert.match(cloudNginx, /proxy_set_header X-Forwarded-Port 443/);
   assert.doesNotMatch(cloudNginx, /Access-Control-Allow-Origin \*/);
+});
+
+test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {
+  assert.match(compose, /KC_PROXY_HEADERS: xforwarded/);
+  for (const endpoint of [
+    "issuer",
+    "authorization_endpoint",
+    "token_endpoint",
+    "userinfo_endpoint",
+    "end_session_endpoint",
+    "jwks_uri",
+  ]) {
+    assert.match(deploymentScript, new RegExp(`\\.${endpoint}`));
+  }
+  assert.match(deploymentScript, /startswith\("https:\/\/"\)/);
 });
 
 test("development realm enables signup only for approved HTTPS origins", () => {
