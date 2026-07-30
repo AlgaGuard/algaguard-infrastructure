@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 const template = readFileSync("aws/development-foundation.yaml", "utf8");
@@ -161,7 +169,14 @@ test("physical session handoff remains default-off and exposes only bounded deve
     cloudCompose,
     /ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: \$\{ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF:-0\}/,
   );
-  assert.doesNotMatch(cloudCompose, /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY/);
+  assert.match(
+    cloudCompose,
+    /^\s{6}PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY:\s*$/m,
+  );
+  assert.doesNotMatch(
+    cloudCompose,
+    /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY:\s*\$\{/,
+  );
   assert.match(cloudNginx, /zone=physical_session_handoff:1m rate=15r\/m/);
   for (const operation of ["start", "redeem"]) {
     assert.match(
@@ -174,6 +189,73 @@ test("physical session handoff remains default-off and exposes only bounded deve
   assert.match(cloudNginx, /limit_except POST \{ deny all; \}/);
   assert.match(cloudNginx, /proxy_set_header Authorization "";/);
   assert.doesNotMatch(cloudNginx, /physical-session-handoffs\/approve/);
+});
+
+test("physical handoff key is omitted while disabled and injected only from the runtime env file", () => {
+  const directory = mkdtempSync(join(tmpdir(), "algaguard-compose-"));
+  const envFile = join(directory, "runtime.env");
+  const syntheticKey = Buffer.alloc(32, 7).toString("base64url");
+  const composeEnvironment = {
+    ...process.env,
+    ECR_REGISTRY: "example.invalid",
+    ACCESS_SERVICE_SHA: "synthetic",
+    DEVICE_SERVICE_SHA: "synthetic",
+    PROFILE_SERVICE_SHA: "synthetic",
+    TELEMETRY_SERVICE_SHA: "synthetic",
+    MQTT_INGESTION_SERVICE_SHA: "synthetic",
+    COMMAND_SERVICE_SHA: "synthetic",
+    OTA_SERVICE_SHA: "synthetic",
+    REALTIME_SERVICE_SHA: "synthetic",
+    API_GATEWAY_SHA: "synthetic",
+    WEB_DASHBOARD_SHA: "synthetic",
+  };
+  delete composeEnvironment.PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY;
+  delete composeEnvironment.ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF;
+
+  const render = (path) => {
+    const result = spawnSync(
+      "docker",
+      [
+        "compose",
+        "--env-file",
+        path,
+        "-f",
+        "compose.yaml",
+        "-f",
+        "compose.application.yaml",
+        "-f",
+        "compose.cloud.yaml",
+        "config",
+        "--format",
+        "json",
+      ],
+      { cwd: process.cwd(), env: composeEnvironment, encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, "Compose configuration must render");
+    return JSON.parse(result.stdout).services["device-service"].environment;
+  };
+
+  try {
+    writeFileSync(
+      envFile,
+      `${readFileSync(".env.example", "utf8")}\nALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF=0\n`,
+      { mode: 0o600 },
+    );
+    const disabled = render(envFile);
+    assert.equal(disabled.ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF, "0");
+    assert.equal(disabled.PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY, null);
+
+    writeFileSync(
+      envFile,
+      `${readFileSync(".env.example", "utf8")}\nALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF=1\nPHYSICAL_SESSION_HANDOFF_WRAPPING_KEY=${syntheticKey}\n`,
+      { mode: 0o600 },
+    );
+    const enabled = render(envFile);
+    assert.equal(enabled.ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF, "1");
+    assert.equal(enabled.PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY, syntheticKey);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("owned-device bootstrap reissue remains development-only and default-off", () => {
