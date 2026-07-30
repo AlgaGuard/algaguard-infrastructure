@@ -150,10 +150,7 @@ test("physical session handoff remains default-off and exposes only bounded deve
     cloudCompose,
     /ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: \$\{ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF:-0\}/,
   );
-  assert.match(
-    cloudCompose,
-    /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY: \$\{PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY:-\}/,
-  );
+  assert.doesNotMatch(cloudCompose, /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY/);
   assert.match(cloudNginx, /zone=physical_session_handoff:1m rate=15r\/m/);
   for (const operation of ["start", "redeem"]) {
     assert.match(
