@@ -145,6 +145,29 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
   assert.doesNotMatch(cloudNginx, /Access-Control-Allow-Origin \*/);
 });
 
+test("physical session handoff remains default-off and exposes only bounded development routes", () => {
+  assert.match(
+    cloudCompose,
+    /ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: \$\{ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF:-0\}/,
+  );
+  assert.match(
+    cloudCompose,
+    /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY: \$\{PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY:-\}/,
+  );
+  assert.match(cloudNginx, /zone=physical_session_handoff:1m rate=15r\/m/);
+  for (const operation of ["start", "redeem"]) {
+    assert.match(
+      cloudNginx,
+      new RegExp(
+        `location = /v1/development/physical-session-handoffs/${operation}`,
+      ),
+    );
+  }
+  assert.match(cloudNginx, /limit_except POST \{ deny all; \}/);
+  assert.match(cloudNginx, /proxy_set_header Authorization "";/);
+  assert.doesNotMatch(cloudNginx, /physical-session-handoffs\/approve/);
+});
+
 test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {
   assert.match(compose, /KC_PROXY_HEADERS: xforwarded/);
   for (const endpoint of [

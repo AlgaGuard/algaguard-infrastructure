@@ -6,7 +6,8 @@ services:
     image: ${ECR_REGISTRY}/algaguard/device-service:${DEVICE_SERVICE_SHA}
     pull_policy: always
     environment:
-      ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: "0"
+      ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: ${ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF:-0}
+      PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY: ${PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY:-}
   profile-service:
     image: ${ECR_REGISTRY}/algaguard/profile-service:${PROFILE_SERVICE_SHA}
     pull_policy: always
