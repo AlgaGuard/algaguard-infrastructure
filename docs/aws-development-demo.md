@@ -92,3 +92,13 @@ active session, does not create a claim/device/ownership record, does not alter
 and stores only its hash. Disable the flag after the replacement session is
 issued. Physical-session handoff remains a separate default-off feature with a
 separate ephemeral wrapping key.
+
+On the development host, the root-owned
+`/opt/algaguard/current/scripts/set-development-recovery-window.sh` command
+provides the bounded operational transition. `enable-reissue` enables only the
+owned-device reissue route. `enable-handoff` disables reissue, creates a fresh
+32-byte wrapping key directly inside the mode-0600 runtime environment, and
+enables only the handoff routes. `disable-all` removes the wrapping key and
+returns both features to their default-off state. Each transition recreates
+only Device Service and waits for its health check; the script never prints the
+wrapping key.

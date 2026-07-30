@@ -8,6 +8,10 @@ const workflow = readFileSync(
   "utf8",
 );
 const deploymentScript = readFileSync("scripts/deploy-development.sh", "utf8");
+const recoveryWindowScript = readFileSync(
+  "scripts/set-development-recovery-window.sh",
+  "utf8",
+);
 const migrationBackupScript = readFileSync(
   "scripts/backup-development-migration.sh",
   "utf8",
@@ -181,6 +185,27 @@ test("owned-device bootstrap reissue remains development-only and default-off", 
     cloudCompose,
     /ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE:\s*1/,
   );
+});
+
+test("development recovery window is bounded, exclusive, and removes its wrapping key", () => {
+  assert.match(
+    recoveryWindowScript,
+    /enable-reissue\|enable-handoff\|disable-all\|status/,
+  );
+  assert.match(recoveryWindowScript, /flock -x/);
+  assert.match(recoveryWindowScript, /chmod 0600 "\$env_file"/);
+  assert.match(recoveryWindowScript, /openssl rand -base64 32/);
+  assert.match(
+    recoveryWindowScript,
+    /ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE=1/,
+  );
+  assert.match(
+    recoveryWindowScript,
+    /ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF=1/,
+  );
+  assert.match(recoveryWindowScript, /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY/);
+  assert.match(recoveryWindowScript, /--force-recreate --wait/);
+  assert.doesNotMatch(recoveryWindowScript, /echo.*wrapping_key/);
 });
 
 test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {
