@@ -330,5 +330,5 @@ jobs:
           done
           output=$(aws ssm get-command-invocation --command-id "$command_id" \
             --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text)
-          printf '%s\n' "$output" | grep -E '^(bootstrap_reissue_enabled|physical_handoff_enabled)=(true|false)$'
+          printf '%s\n' "$output" | grep -E '^(bootstrap_reissue_enabled|physical_handoff_enabled|development_onboarding_window_configured)=(true|false)$'
           test "$status" = Success

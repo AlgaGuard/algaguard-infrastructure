@@ -286,6 +286,18 @@ test("development recovery window is bounded, exclusive, and removes its wrappin
     /ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF=1/,
   );
   assert.match(recoveryWindowScript, /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY/);
+  assert.match(
+    recoveryWindowScript,
+    /ALGAGUARD_DEVELOPMENT_ONBOARDING_WINDOW_SECONDS=900/,
+  );
+  assert.match(
+    cloudCompose,
+    /ALGAGUARD_DEVELOPMENT_ONBOARDING_WINDOW_SECONDS:/,
+  );
+  assert.match(
+    recoveryWindowScript,
+    /development_onboarding_window_configured=(true|false)/,
+  );
   assert.match(recoveryWindowScript, /--force-recreate --wait/);
   assert.doesNotMatch(recoveryWindowScript, /echo.*wrapping_key/);
   assert.match(
@@ -297,6 +309,44 @@ test("development recovery window is bounded, exclusive, and removes its wrappin
   assert.match(workflow, /environment: development/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /AWS-RunShellScript/);
+});
+
+test("development onboarding timing is default-off and shared by both recovery modes", () => {
+  assert.doesNotMatch(
+    cloudCompose,
+    /ALGAGUARD_DEVELOPMENT_ONBOARDING_WINDOW_SECONDS:\s*900/,
+  );
+  assert.equal(
+    recoveryWindowScript.match(
+      /ALGAGUARD_DEVELOPMENT_ONBOARDING_WINDOW_SECONDS=900/g,
+    )?.length,
+    2,
+  );
+});
+
+test("disable cleanup removes timing and secret material from the runtime environment", () => {
+  const filter = recoveryWindowScript.slice(
+    recoveryWindowScript.indexOf("awk -F="),
+    recoveryWindowScript.lastIndexOf('case "$action" in'),
+  );
+  assert.match(filter, /ALGAGUARD_DEVELOPMENT_ONBOARDING_WINDOW_SECONDS/);
+  assert.match(filter, /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY/);
+});
+
+test("failed recovery transitions restore the previous mode-0600 environment", () => {
+  assert.match(recoveryWindowScript, /rollback_on_failure/);
+  assert.match(recoveryWindowScript, /cp -- "\$original" "\$env_file"/);
+  assert.match(recoveryWindowScript, /chmod 0600 "\$env_file"/);
+  assert.match(recoveryWindowScript, /trap rollback_on_failure EXIT/);
+});
+
+test("recovery controls expose only safe booleans and never print the wrapping key", () => {
+  assert.match(
+    recoveryWindowScript,
+    /development_onboarding_window_configured=true/,
+  );
+  assert.doesNotMatch(recoveryWindowScript, /printf '%s\\n' "\$wrapping_key"/);
+  assert.doesNotMatch(recoveryWindowScript, /echo.*wrapping_key/);
 });
 
 test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {

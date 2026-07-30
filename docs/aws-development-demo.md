@@ -99,6 +99,9 @@ provides the bounded operational transition. `enable-reissue` enables only the
 owned-device reissue route. `enable-handoff` disables reissue, creates a fresh
 32-byte wrapping key directly inside the mode-0600 runtime environment, and
 enables only the handoff routes. `disable-all` removes the wrapping key and
-returns both features to their default-off state. Each transition recreates
+the development timing override, then returns both features to their
+default-off state. `enable-reissue` and `enable-handoff` apply the same bounded
+15-minute server window; the server-returned expiry remains authoritative.
+Each transition recreates
 only Device Service and waits for its health check; the script never prints the
 wrapping key.
