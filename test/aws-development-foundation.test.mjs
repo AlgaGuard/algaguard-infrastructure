@@ -206,6 +206,15 @@ test("development recovery window is bounded, exclusive, and removes its wrappin
   assert.match(recoveryWindowScript, /PHYSICAL_SESSION_HANDOFF_WRAPPING_KEY/);
   assert.match(recoveryWindowScript, /--force-recreate --wait/);
   assert.doesNotMatch(recoveryWindowScript, /echo.*wrapping_key/);
+  assert.match(
+    workflow,
+    /options:\s*\[full-deploy, enable-reissue, enable-handoff, disable-all, status\]/,
+  );
+  assert.match(workflow, /if: inputs\.recovery_action != 'full-deploy'/);
+  assert.match(workflow, /set-development-recovery-window\.sh \$ACTION/);
+  assert.match(workflow, /environment: development/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /AWS-RunShellScript/);
 });
 
 test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {

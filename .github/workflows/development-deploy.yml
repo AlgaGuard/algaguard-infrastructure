@@ -3,17 +3,50 @@ name: Development deployment
 on:
   workflow_dispatch:
     inputs:
-      contracts_sha: {description: Exact algaguard-contracts develop SHA, required: true, type: string}
-      device_service_sha: {description: Exact algaguard-device-service develop SHA, required: true, type: string}
-      mobile_sha: {description: Exact algaguard-mobile-app develop SHA, required: true, type: string}
-      infrastructure_sha: {description: Exact algaguard-infrastructure develop SHA, required: true, type: string}
-      firmware_sha: {description: Exact firmware feat/ble-wifi-provisioning SHA, required: true, type: string}
+      contracts_sha:
+        {
+          description: Exact algaguard-contracts develop SHA,
+          required: true,
+          type: string,
+        }
+      device_service_sha:
+        {
+          description: Exact algaguard-device-service develop SHA,
+          required: true,
+          type: string,
+        }
+      mobile_sha:
+        {
+          description: Exact algaguard-mobile-app develop SHA,
+          required: true,
+          type: string,
+        }
+      infrastructure_sha:
+        {
+          description: Exact algaguard-infrastructure develop SHA,
+          required: true,
+          type: string,
+        }
+      firmware_sha:
+        {
+          description: Exact firmware feat/ble-wifi-provisioning SHA,
+          required: true,
+          type: string,
+        }
+      recovery_action:
+        description: Full deploy or one bounded development recovery-window transition
+        required: true
+        default: full-deploy
+        type: choice
+        options:
+          [full-deploy, enable-reissue, enable-handoff, disable-all, status]
 
 permissions:
   contents: read
 
 jobs:
   verify-current-branches:
+    if: inputs.recovery_action == 'full-deploy'
     runs-on: ubuntu-latest
     environment: development
     steps:
@@ -40,6 +73,7 @@ jobs:
           verify algaguard-firmware feat/ble-wifi-provisioning "$FIRMWARE_SHA"
 
   prepare-images:
+    if: inputs.recovery_action == 'full-deploy'
     needs: verify-current-branches
     runs-on: ubuntu-latest
     environment: development
@@ -66,6 +100,7 @@ jobs:
           NODE
 
   build-images:
+    if: inputs.recovery_action == 'full-deploy'
     needs: prepare-images
     strategy:
       fail-fast: false
@@ -110,6 +145,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
   deploy:
+    if: inputs.recovery_action == 'full-deploy'
     needs: [verify-current-branches, build-images]
     runs-on: ubuntu-latest
     environment: development
@@ -241,3 +277,58 @@ jobs:
           curl --fail --silent --show-error --max-time 30 https://api.algaguard.bosilu.dev/health >/dev/null
           curl --fail --silent --show-error --max-time 30 \
             https://auth.algaguard.bosilu.dev/realms/algaguard/.well-known/openid-configuration >/dev/null
+
+  recovery-window:
+    if: inputs.recovery_action != 'full-deploy'
+    runs-on: ubuntu-latest
+    environment: development
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.infrastructure_sha }}
+      - name: Verify exact infrastructure branch head and allow-listed action
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INFRA_SHA: ${{ inputs.infrastructure_sha }}
+          ACTION: ${{ inputs.recovery_action }}
+        run: |
+          set -euo pipefail
+          actual=$(gh api repos/AlgaGuard/algaguard-infrastructure/git/ref/heads/develop --jq .object.sha)
+          test "$actual" = "$INFRA_SHA"
+          case "$ACTION" in
+            enable-reissue|enable-handoff|disable-all|status) ;;
+            *) exit 2 ;;
+          esac
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEVELOPMENT_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Apply bounded recovery-window transition through SSM
+        env:
+          ACTION: ${{ inputs.recovery_action }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          set -euo pipefail
+          command="/opt/algaguard/current/scripts/set-development-recovery-window.sh $ACTION"
+          jq -n --arg command "$command" '{commands:["set -eu", $command]}' >ssm-parameters.json
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "AlgaGuard bounded development recovery window" \
+            --parameters file://ssm-parameters.json \
+            --query Command.CommandId --output text)
+          status=Pending
+          for _ in $(seq 1 120); do
+            status=$(aws ssm get-command-invocation --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || printf Pending)
+            case "$status" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 2
+          done
+          output=$(aws ssm get-command-invocation --command-id "$command_id" \
+            --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text)
+          printf '%s\n' "$output" | grep -E '^(bootstrap_reissue_enabled|physical_handoff_enabled)=(true|false)$'
+          test "$status" = Success
