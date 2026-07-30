@@ -86,6 +86,30 @@ services:
       access-service:
         condition: service_healthy
 
+  demo-telemetry-simulator:
+    <<: *node-service
+    profiles: [demo-simulator]
+    command: ["node", "dist/src/demo-telemetry-worker.js"]
+    environment:
+      <<: *node-environment
+      ALGAGUARD_ENABLE_DEMO_TELEMETRY_SIMULATOR: ${ALGAGUARD_ENABLE_DEMO_TELEMETRY_SIMULATOR:-0}
+      TELEMETRY_SERVICE_URL: http://telemetry-service:3000
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080/realms/algaguard/protocol/openid-connect/token
+      SERVICE_CLIENT_ID: algaguard-mqtt-ingestion-service
+      SERVICE_CLIENT_SECRET: ${ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET}
+    restart: unless-stopped
+    depends_on:
+      <<: *node-dependencies
+      keycloak:
+        condition: service_healthy
+      telemetry-service:
+        condition: service_healthy
+      device-service:
+        condition: service_healthy
+    ports: []
+    healthcheck:
+      disable: true
+
   profile-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-profile-service
