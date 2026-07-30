@@ -7,10 +7,7 @@ const workflow = readFileSync(
   ".github/workflows/development-deploy.yml",
   "utf8",
 );
-const deploymentScript = readFileSync(
-  "scripts/deploy-development.sh",
-  "utf8",
-);
+const deploymentScript = readFileSync("scripts/deploy-development.sh", "utf8");
 const migrationBackupScript = readFileSync(
   "scripts/backup-development-migration.sh",
   "utf8",
@@ -69,7 +66,10 @@ test("volume downsizing uses encrypted migration backup and checked restore", ()
   assert.match(migrationBackupScript, /--sse AES256/);
   assert.match(migrationRestoreScript, /sha256sum --check --status/);
   assert.match(migrationRestoreScript, /rollback_state/);
-  assert.match(migrationRestoreScript, /systemctl start algaguard-development\.service/);
+  assert.match(
+    migrationRestoreScript,
+    /systemctl start algaguard-development\.service/,
+  );
   assert.match(
     deploymentScript,
     /install -m 0755 "\$release_dir\/scripts\/backup-development-migration\.sh"/,
@@ -110,7 +110,8 @@ test("OIDC trust is repository and protected-environment scoped", () => {
 
 test("all application ECR repositories scan and retain bounded images", () => {
   const repositories = template.match(/RepositoryName: algaguard\//g) ?? [];
-  const scans = template.match(/ImageScanningConfiguration: \{ScanOnPush: true\}/g) ?? [];
+  const scans =
+    template.match(/ImageScanningConfiguration: \{ScanOnPush: true\}/g) ?? [];
   const lifecycles = template.match(/retain 10/g) ?? [];
   assert.equal(repositories.length, 10);
   assert.equal(scans.length, 10);
@@ -137,8 +138,14 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
   assert.match(cloudNginx, /location @web_spa/);
   assert.match(cloudNginx, /rewrite \^ \/ break/);
   assert.match(cloudNginx, /"https:\/\/algaguard\.bosilu\.dev" \$http_origin/);
-  assert.match(cloudNginx, /Access-Control-Allow-Origin \$dashboard_cors_origin always/);
-  assert.match(cloudNginx, /Access-Control-Allow-Headers "Authorization, Content-Type, X-Correlation-ID"/);
+  assert.match(
+    cloudNginx,
+    /Access-Control-Allow-Origin \$dashboard_cors_origin always/,
+  );
+  assert.match(
+    cloudNginx,
+    /Access-Control-Allow-Headers "Authorization, Content-Type, X-Correlation-ID"/,
+  );
   assert.match(cloudNginx, /if \(\$request_method = OPTIONS\)/);
   assert.match(cloudNginx, /proxy_set_header X-Forwarded-Proto https/);
   assert.match(cloudNginx, /proxy_set_header X-Forwarded-Port 443/);
@@ -165,6 +172,17 @@ test("physical session handoff remains default-off and exposes only bounded deve
   assert.doesNotMatch(cloudNginx, /physical-session-handoffs\/approve/);
 });
 
+test("owned-device bootstrap reissue remains development-only and default-off", () => {
+  assert.match(
+    cloudCompose,
+    /ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE: \$\{ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE:-0\}/,
+  );
+  assert.doesNotMatch(
+    cloudCompose,
+    /ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE:\s*1/,
+  );
+});
+
 test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {
   assert.match(compose, /KC_PROXY_HEADERS: xforwarded/);
   for (const endpoint of [
@@ -182,7 +200,9 @@ test("public OIDC metadata remains HTTPS behind the trusted proxy", () => {
 
 test("development realm enables signup only for approved HTTPS origins", () => {
   assert.equal(realm.registrationAllowed, true);
-  const web = realm.clients.find((client) => client.clientId === "algaguard-web");
+  const web = realm.clients.find(
+    (client) => client.clientId === "algaguard-web",
+  );
   assert.deepEqual(web.redirectUris, [
     "https://localhost:8443/*",
     "https://algaguard.bosilu.dev/*",
@@ -195,7 +215,9 @@ test("development realm enables signup only for approved HTTPS origins", () => {
   const mobile = realm.clients.find(
     (client) => client.clientId === "algaguard-mobile",
   );
-  assert.deepEqual(mobile.redirectUris, ["com.algaguard.mobile:/oauthredirect"]);
+  assert.deepEqual(mobile.redirectUris, [
+    "com.algaguard.mobile:/oauthredirect",
+  ]);
   for (const client of [web, mobile]) {
     const audience = client.protocolMappers.find(
       (mapper) => mapper.name === "algaguard-api-audience",
@@ -209,8 +231,14 @@ test("development realm enables signup only for approved HTTPS origins", () => {
 
 test("cloud dashboard is built only with trusted public endpoints", () => {
   assert.match(workflow, /cat >\.env\.production/);
-  assert.match(workflow, /VITE_API_BASE_URL=https:\/\/api\.algaguard\.bosilu\.dev\/v1/);
-  assert.match(workflow, /VITE_KEYCLOAK_URL=https:\/\/auth\.algaguard\.bosilu\.dev/);
+  assert.match(
+    workflow,
+    /VITE_API_BASE_URL=https:\/\/api\.algaguard\.bosilu\.dev\/v1/,
+  );
+  assert.match(
+    workflow,
+    /VITE_KEYCLOAK_URL=https:\/\/auth\.algaguard\.bosilu\.dev/,
+  );
   assert.match(
     workflow,
     /VITE_WEBSOCKET_URL=wss:\/\/realtime\.algaguard\.bosilu\.dev\/realtime/,
@@ -227,10 +255,7 @@ test("deployment preserves private-key modes while granting the runtime owner ac
     deploymentScript,
     /chown -R 1000:1000 \/opt\/algaguard\/runtime\/pki/,
   );
-  assert.match(
-    deploymentScript,
-    /install -d -m 0755 "\$release_dir\/\.local"/,
-  );
+  assert.match(deploymentScript, /install -d -m 0755 "\$release_dir\/\.local"/);
   assert.match(workflow, /for _ in \$\(seq 1 120\)/);
   assert.doesNotMatch(workflow, /aws ssm wait command-executed/);
   assert.match(deploymentScript, /kcadm\.sh update "clients\/\$client_id"/);
@@ -245,8 +270,14 @@ test("deployment preserves private-key modes while granting the runtime owner ac
     deploymentScript,
     /redirectUris=\["com\.algaguard\.mobile:\/oauthredirect"\]/,
   );
-  assert.match(deploymentScript, /for public_client in algaguard-web algaguard-mobile/);
-  assert.match(deploymentScript, /clients\/\$client_id\/protocol-mappers\/models/);
+  assert.match(
+    deploymentScript,
+    /for public_client in algaguard-web algaguard-mobile/,
+  );
+  assert.match(
+    deploymentScript,
+    /clients\/\$client_id\/protocol-mappers\/models/,
+  );
   assert.match(deploymentScript, /algaguard-api-audience/);
   assert.doesNotMatch(deploymentScript, /--fields attributes/);
   assert.match(

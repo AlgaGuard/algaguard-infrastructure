@@ -80,3 +80,15 @@ backup bucket. On a replacement host,
 checksum, restores the state while Docker is stopped, and rolls back its local
 changes if extraction or service startup fails. Never use the migration archive
 as a public artifact.
+
+## Owned-device bootstrap recovery
+
+`ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE` defaults to `0`. It may be
+set to `1` only for a bounded development/demo recovery window. The Device
+Service then permits an authenticated current owner to request one short-lived
+bootstrap session for an existing claimed device. The operation rejects an
+active session, does not create a claim/device/ownership record, does not alter
+`ownershipVersion`, returns the token only once with `Cache-Control: no-store`,
+and stores only its hash. Disable the flag after the replacement session is
+issued. Physical-session handoff remains a separate default-off feature with a
+separate ephemeral wrapping key.

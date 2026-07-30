@@ -7,6 +7,7 @@ services:
     pull_policy: always
     environment:
       ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF: ${ALGAGUARD_ENABLE_PHYSICAL_SESSION_HANDOFF:-0}
+      ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE: ${ALGAGUARD_ENABLE_OWNED_DEVICE_BOOTSTRAP_REISSUE:-0}
   profile-service:
     image: ${ECR_REGISTRY}/algaguard/profile-service:${PROFILE_SERVICE_SHA}
     pull_policy: always
