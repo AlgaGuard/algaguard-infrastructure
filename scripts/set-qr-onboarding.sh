@@ -16,8 +16,9 @@ compose=(docker compose --env-file "$env_file" -f "$release/compose.yaml"
   -f "$release/compose.application.yaml" -f "$release/compose.cloud.yaml")
 
 status() {
+  remote_status_command="printf '%s' \"\${ALGAGUARD_ENABLE_QR_ONBOARDING:-0}\""
   enabled=$("${compose[@]}" exec -T device-service sh -c \
-    'printf "%s" "${ALGAGUARD_ENABLE_QR_ONBOARDING:-0}"' 2>/dev/null || printf 0)
+    "$remote_status_command" 2>/dev/null || printf 0)
   if [ "$enabled" = 1 ]; then echo QR_ONBOARDING_ENABLED; else echo QR_ONBOARDING_DISABLED; fi
 }
 
@@ -44,9 +45,11 @@ if [ "$action" = enable ]; then
     --name /algaguard/development/qr-onboarding-signing-private-key-pkcs8 \
     --query Parameter.Value --output text >"$secret"
   test "$(tr -d '\r\n' <"$secret" | wc -c)" -ge 120
-  printf 'ALGAGUARD_ENABLE_QR_ONBOARDING=1\nQR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8=' >>"$temporary"
-  tr -d '\r\n' <"$secret" >>"$temporary"
-  printf '\n' >>"$temporary"
+  {
+    printf 'ALGAGUARD_ENABLE_QR_ONBOARDING=1\nQR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8='
+    tr -d '\r\n' <"$secret"
+    printf '\n'
+  } >>"$temporary"
   rm -f "$secret"
 else
   printf 'ALGAGUARD_ENABLE_QR_ONBOARDING=0\n' >>"$temporary"
