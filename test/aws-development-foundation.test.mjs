@@ -191,6 +191,34 @@ test("physical session handoff remains default-off and exposes only bounded deve
   assert.doesNotMatch(cloudNginx, /physical-session-handoffs\/approve/);
 });
 
+test("firmware credential bootstrap uses exact POST-only Device Service routes", () => {
+  const exchange = cloudNginx.match(
+    /location = \/services\/device\/device-credential-bootstrap\/exchange \{([\s\S]*?)\n    \}/,
+  )?.[1];
+  const issue = cloudNginx.match(
+    /location = \/services\/device\/device-credential-bootstrap\/issue \{([\s\S]*?)\n    \}/,
+  )?.[1];
+
+  assert.ok(exchange);
+  assert.ok(issue);
+  assert.match(exchange, /limit_except POST \{ deny all; \}/);
+  assert.match(issue, /limit_except POST \{ deny all; \}/);
+  assert.match(
+    exchange,
+    /proxy_pass http:\/\/device-service:3000\/v1\/device-credential-bootstrap\/exchange;/,
+  );
+  assert.match(
+    issue,
+    /proxy_pass http:\/\/device-service:3000\/v1\/device-credential-bootstrap\/issue;/,
+  );
+  assert.match(exchange, /proxy_set_header Authorization "";/);
+  assert.match(issue, /proxy_set_header Authorization \$http_authorization;/);
+  assert.doesNotMatch(
+    cloudNginx,
+    /location \/services\/device\/device-credential-bootstrap/,
+  );
+});
+
 test("physical handoff key is omitted while disabled and injected only from the runtime env file", () => {
   const directory = mkdtempSync(join(tmpdir(), "algaguard-compose-"));
   const envFile = join(directory, "runtime.env");
