@@ -85,6 +85,8 @@ append_parameter ALGAGUARD_OTA_SERVICE_SECRET ota-service-secret
 append_parameter ALGAGUARD_FIRMWARE_RELEASE_SECRET firmware-release-secret
 append_parameter BROKER_DEVICE_AUTH_TOKEN broker-device-auth-token
 append_parameter EMQX_NODE_COOKIE emqx-node-cookie
+append_parameter QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8 qr-onboarding-signing-private-key-pkcs8
+printf 'ALGAGUARD_ENABLE_QR_ONBOARDING=1\n' >>"$runtime_env"
 mv "$runtime_env" "$release_dir/.env"
 chmod 0600 "$release_dir/.env"
 
