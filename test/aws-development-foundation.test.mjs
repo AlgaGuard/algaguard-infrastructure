@@ -98,12 +98,25 @@ test("migration restart waits for application DNS dependencies before NGINX", ()
   assert.doesNotMatch(deploymentScript, /--wait-timeout 600/);
   assert.equal(
     [...deploymentScript.matchAll(/--wait-timeout 900/g)].length,
-    2,
-    "deployment and rollback must both tolerate t3.micro startup latency",
+    3,
+    "deployment and both rollback paths must tolerate startup latency",
   );
   assert.match(cloudCompose, /api-gateway:\s+condition: service_healthy/);
   assert.match(cloudCompose, /realtime-service:\s+condition: service_healthy/);
   assert.match(cloudCompose, /web-dashboard:\s+condition: service_started/);
+});
+
+test("deployment applies Device Service migrations and rolls back on failure", () => {
+  assert.match(
+    deploymentScript,
+    /run --rm --no-deps device-service \\\n+  node dist\/scripts\/migrate\.js/,
+  );
+  assert.match(deploymentScript, /exit 5/);
+  assert.equal(
+    [...deploymentScript.matchAll(/ln -sfn "\$previous" \/opt\/algaguard\/current/g)]
+      .length,
+    2,
+  );
 });
 
 test("OIDC trust is repository and protected-environment scoped", () => {

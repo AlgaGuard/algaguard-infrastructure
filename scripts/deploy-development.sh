@@ -152,6 +152,17 @@ if ! "${compose[@]}" up -d --no-build --remove-orphans --wait --wait-timeout 900
   exit 4
 fi
 
+if ! "${compose[@]}" run --rm --no-deps device-service \
+  node dist/scripts/migrate.js; then
+  if [ -n "$previous" ] && [ -d "$previous" ]; then
+    ln -sfn "$previous" /opt/algaguard/current
+    docker compose --env-file "$previous/.env" -f "$previous/compose.yaml" \
+      -f "$previous/compose.application.yaml" -f "$previous/compose.cloud.yaml" \
+      up -d --no-build --remove-orphans --wait --wait-timeout 900
+  fi
+  exit 5
+fi
+
 "${compose[@]}" exec -T keycloak sh <<'KEYCLOAK'
 set -eu
 config=$(mktemp)
