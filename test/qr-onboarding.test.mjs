@@ -10,7 +10,14 @@ const workflow = fs.readFileSync('.github/workflows/qr-onboarding.yml', 'utf8');
 test('QR onboarding is disabled by default and mapped only to Device Service', () => {
   assert.match(app, /ALGAGUARD_ENABLE_QR_ONBOARDING:-0/);
   assert.match(cloud, /ALGAGUARD_ENABLE_QR_ONBOARDING:-0/);
-  assert.match(cloud, /^\s{6}QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8:\s*$/m);
+  assert.match(
+    app,
+    /QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8: \$\{QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8:-\}/,
+  );
+  assert.match(
+    cloud,
+    /QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8: \$\{QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8:-\}/,
+  );
 });
 
 test('protected controller injects and removes the signing key without printing it', () => {
