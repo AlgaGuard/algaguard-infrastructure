@@ -157,11 +157,14 @@ function isEmpty(directory) {
 }
 
 function serverCertificate() {
+  const publicMqttHost = process.env.PUBLIC_MQTT_HOST ?? "localhost";
+  if (!/^[a-zA-Z0-9.-]+$/.test(publicMqttHost))
+    fail("PUBLIC_MQTT_HOST must be a DNS hostname.");
   const certificate = sign("emqx", "emqx", "device-ca", [
     "basicConstraints=critical,CA:FALSE",
     "keyUsage=critical,digitalSignature,keyEncipherment",
     "extendedKeyUsage=serverAuth",
-    "subjectAltName=DNS:emqx,DNS:localhost,IP:127.0.0.1",
+    `subjectAltName=DNS:emqx,DNS:localhost,DNS:${publicMqttHost},IP:127.0.0.1`,
   ]);
   process.stdout.write(`Created development EMQX public certificate ${certificate}\n`);
 }

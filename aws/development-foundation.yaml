@@ -3,7 +3,7 @@ Description: AlgaGuard Thursday demo development foundation
 Parameters:
   VpcId: {Type: AWS::EC2::VPC::Id}
   SubnetId: {Type: AWS::EC2::Subnet::Id}
-  InstanceType: {Type: String, Default: t3.micro, AllowedValues: [t3.micro]}
+  InstanceType: {Type: String, Default: m7i-flex.large, AllowedValues: [m7i-flex.large]}
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
@@ -34,11 +34,12 @@ Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: AlgaGuard development HTTPS only; no SSH
+      GroupDescription: AlgaGuard development HTTPS and mTLS MQTT; no SSH
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: ACME and HTTPS redirect}
         - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: Trusted HTTPS}
+        - {IpProtocol: tcp, FromPort: 8883, ToPort: 8883, CidrIp: 0.0.0.0/0, Description: Device MQTT over mutual TLS}
       Tags:
         - {Key: Project, Value: AlgaGuard}
         - {Key: Environment, Value: Development}

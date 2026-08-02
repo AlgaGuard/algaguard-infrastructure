@@ -1,9 +1,10 @@
 # AWS development demo
 
-The Thursday demo uses one SSM-managed Amazon Linux `t3.micro` instance with a
+The Thursday demo uses one SSM-managed Amazon Linux `m7i-flex.large` instance with a
 30 GiB encrypted gp3 root volume, a persistent 2 GiB swap file, and an Elastic
 IP. Only ports 80 and 443 are public; SSH, databases, cache, admin services, and
-MQTT stay closed. GitHub Actions assumes exact repository/environment OIDC
+Device MQTT is exposed only on TCP 8883 with certificate-bound mutual TLS and
+exact per-device ACLs. GitHub Actions assumes exact repository/environment OIDC
 roles and deploys immutable commit-SHA images by SSM Run Command. Runtime
 secrets are read from `/algaguard/development/` in SSM.
 
@@ -17,12 +18,14 @@ instance is stopped.
 
 ## DNS and TLS
 
-Create `A` records for `algaguard`, `api.algaguard`, `auth.algaguard`, and
-`realtime.algaguard` at Porkbun, all targeting the stack Elastic IP. The
-deployment refuses certificate issuance until all four names resolve to the
-expected address. NGINX redirects HTTP to HTTPS and serves only a publicly
-trusted certificate for those names. A systemd timer performs bounded renewal
-checks. MQTT remains closed.
+Create `A` records for `algaguard`, `api.algaguard`, `auth.algaguard`,
+`realtime.algaguard`, and `mqtt.algaguard` at Porkbun, all targeting the stack
+Elastic IP. The deployment refuses HTTPS certificate issuance until the first
+four names resolve and separately refuses device MQTT activation until the MQTT
+name resolves. NGINX redirects HTTP to HTTPS and serves only a publicly trusted
+certificate for the web names; the MQTT listener uses its development device
+CA for certificate-bound mutual TLS. A systemd timer performs bounded HTTPS
+renewal checks. Database, cache, broker administration, and SSH remain closed.
 
 ## Immutable deployment
 
@@ -57,7 +60,7 @@ synthetic restore proof is `/opt/algaguard/bin/verify-backup-restore`. Backups
 are encrypted and private, expire after 14 days, and noncurrent versions expire
 after 7 days.
 
-The infrastructure profile is intentionally bounded to `t3.micro` and 30 GiB,
+The infrastructure profile is intentionally bounded to `m7i-flex.large` and 30 GiB,
 which are common EC2 Free Tier dimensions. Free Tier eligibility is
 account- and offer-dependent, and it is not a hard spending cap. Public IPv4,
 EBS retained after instance termination, snapshots, ECR, DNS, transfer, and

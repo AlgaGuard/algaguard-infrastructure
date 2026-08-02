@@ -186,6 +186,7 @@ jobs:
           PUBLIC_KEYCLOAK_URL=https://auth.algaguard.bosilu.dev
           PUBLIC_MQTT_HOST=mqtt.algaguard.bosilu.dev
           PUBLIC_MQTT_PORT=8883
+          DEVICE_MQTT_BIND_ADDRESS=0.0.0.0
           PUBLIC_OTA_BASE_URL=https://api.algaguard.bosilu.dev
           PUBLIC_TLS_HOSTS=algaguard.bosilu.dev
           POSTGRES_DB=algaguard

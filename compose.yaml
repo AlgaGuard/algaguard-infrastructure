@@ -120,7 +120,7 @@ services:
       emqx-pki-init:
         condition: service_completed_successfully
     ports:
-      - "127.0.0.1:8883:8883"
+      - "${DEVICE_MQTT_BIND_ADDRESS:-127.0.0.1}:8883:8883"
     healthcheck:
       test: [CMD, /opt/emqx/bin/emqx, ctl, status]
       interval: 15s

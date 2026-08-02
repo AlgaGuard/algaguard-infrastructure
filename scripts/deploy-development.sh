@@ -29,6 +29,10 @@ case "$release_dir" in
   *) echo 'Unsafe release directory.' >&2; exit 2 ;;
 esac
 test -f "$release_dir/release.env"
+public_mqtt_host=$(awk -F= '$1 == "PUBLIC_MQTT_HOST" {print $2}' "$release_dir/release.env")
+case "$public_mqtt_host" in
+  ''|*[!A-Za-z0-9.-]*) echo 'Invalid public MQTT hostname.' >&2; exit 2 ;;
+esac
 
 ensure_swap
 
@@ -105,6 +109,38 @@ if [ ! -f /opt/algaguard/runtime/.pki-ready ]; then
     -w /workspace node:22-bookworm node scripts/pki.mjs ota-signing-key
   touch /opt/algaguard/runtime/.pki-ready
 fi
+# The development broker certificate is CA-signed and may be rotated without
+# changing issued device identities. Regenerate only when the immutable public
+# MQTT hostname is absent from its SANs.
+if ! openssl x509 -in /opt/algaguard/runtime/pki/emqx/tls.crt -noout -ext subjectAltName 2>/dev/null |
+  grep -Fq "DNS:${public_mqtt_host}"; then
+  broker_certificate_backup=$(mktemp -d /opt/algaguard/runtime/.emqx-cert-backup.XXXXXX)
+  chmod 0700 "$broker_certificate_backup"
+  cp --preserve=mode /opt/algaguard/runtime/pki/emqx/tls.crt \
+    /opt/algaguard/runtime/pki/emqx/tls.key "$broker_certificate_backup/"
+  restore_broker_certificate() {
+    cp --preserve=mode "$broker_certificate_backup/tls.crt" \
+      "$broker_certificate_backup/tls.key" /opt/algaguard/runtime/pki/emqx/
+    rm -f "$broker_certificate_backup/tls.crt" "$broker_certificate_backup/tls.key"
+    rmdir "$broker_certificate_backup"
+  }
+  trap restore_broker_certificate EXIT HUP INT TERM
+  rm -f /opt/algaguard/runtime/pki/emqx/tls.crt \
+        /opt/algaguard/runtime/pki/emqx/tls.key
+  docker run --rm --network none \
+    -e PUBLIC_MQTT_HOST="$public_mqtt_host" \
+    -v "$release_dir:/workspace" \
+    -v /opt/algaguard/runtime/pki:/workspace/.local/pki \
+    -w /workspace node:22-bookworm node scripts/pki.mjs server-cert
+  openssl x509 -in /opt/algaguard/runtime/pki/emqx/tls.crt -noout \
+    -ext subjectAltName | grep -Fq "DNS:${public_mqtt_host}"
+  cmp -s \
+    <(openssl x509 -in /opt/algaguard/runtime/pki/emqx/tls.crt -pubkey -noout) \
+    <(openssl pkey -in /opt/algaguard/runtime/pki/emqx/tls.key -pubout)
+  rm -f "$broker_certificate_backup/tls.crt" "$broker_certificate_backup/tls.key"
+  rmdir "$broker_certificate_backup"
+  trap - EXIT HUP INT TERM
+fi
 # Application containers intentionally run as the fixed unprivileged 1000:1000
 # development runtime identity. Keep generated private material owner-readable
 # without broadening its mode beyond the PKI tool's 0600 protection.
@@ -126,6 +162,12 @@ if [ ! -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]; then
     --agree-tos --register-unsafely-without-email \
     -d "$domain" -d "api.$domain" -d "auth.$domain" -d "realtime.$domain"
 fi
+
+getent ahostsv4 "$public_mqtt_host" | awk '{print $1}' |
+  grep -qx '52.74.126.184' || {
+    echo "DNS is not ready for the public MQTT hostname." >&2
+    exit 3
+  }
 
 aws ecr get-login-password --region "$region" |
   docker login --username AWS --password-stdin "${account_id}.dkr.ecr.${region}.amazonaws.com" >/dev/null

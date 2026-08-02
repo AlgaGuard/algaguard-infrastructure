@@ -39,18 +39,19 @@ const realm = JSON.parse(
   readFileSync("keycloak/algaguard-development-realm.json", "utf8"),
 );
 
-test("development host exposes HTTPS and ACME only without SSH", () => {
+test("development host exposes HTTPS, ACME, and device mTLS MQTT without SSH", () => {
   assert.match(template, /FromPort: 80, ToPort: 80/);
   assert.match(template, /FromPort: 443, ToPort: 443/);
+  assert.match(template, /FromPort: 8883, ToPort: 8883/);
   assert.doesNotMatch(template, /FromPort: 22|ToPort: 22/);
   assert.match(template, /Encrypted: true/);
   assert.match(template, /systemctl disable --now sshd/);
 });
 
-test("development host uses the bounded free-tier compute and storage profile", () => {
+test("development host uses the approved full-stack compute and bounded storage profile", () => {
   assert.match(
     template,
-    /InstanceType: \{Type: String, Default: t3\.micro, AllowedValues: \[t3\.micro\]\}/,
+    /InstanceType: \{Type: String, Default: m7i-flex\.large, AllowedValues: \[m7i-flex\.large\]\}/,
   );
   assert.match(
     template,
@@ -143,7 +144,7 @@ test("all application ECR repositories scan and retain bounded images", () => {
   assert.equal(lifecycles.length, 10);
 });
 
-test("cloud routes use trusted hostnames and reserve MQTT", () => {
+test("cloud routes use trusted hostnames while MQTT stays outside NGINX", () => {
   for (const host of [
     "algaguard.bosilu.dev",
     "api.algaguard.bosilu.dev",
@@ -153,6 +154,12 @@ test("cloud routes use trusted hostnames and reserve MQTT", () => {
     assert.match(cloudNginx, new RegExp(host.replaceAll(".", "\\.")));
   }
   assert.doesNotMatch(cloudNginx, /listen 8883/);
+  assert.match(workflow, /PUBLIC_MQTT_HOST=mqtt\.algaguard\.bosilu\.dev/);
+  assert.match(compose, /DEVICE_MQTT_BIND_ADDRESS:-127\.0\.0\.1/);
+  assert.match(deploymentScript, /DNS:\$\{public_mqtt_host\}/);
+  assert.match(deploymentScript, /\.emqx-cert-backup/);
+  assert.match(deploymentScript, /trap restore_broker_certificate EXIT HUP INT TERM/);
+  assert.match(deploymentScript, /openssl x509[\s\S]*openssl pkey/);
   assert.match(cloudNginx, /TLSv1\.2 TLSv1\.3/);
   assert.match(cloudNginx, /listen 127\.0\.0\.1:8081/);
   assert.match(cloudNginx, /location = \/health \{ return 200; \}/);
