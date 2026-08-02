@@ -51,7 +51,7 @@ test("development host exposes HTTPS, ACME, and device mTLS MQTT without SSH", (
 test("development host uses the approved full-stack compute and bounded storage profile", () => {
   assert.match(
     template,
-    /InstanceType: \{Type: String, Default: m7i-flex\.large, AllowedValues: \[m7i-flex\.large\]\}/,
+    /InstanceType: \{Type: String, Default: m7i-flex\.large, AllowedValues: \[t3\.micro, m7i-flex\.large\]\}/,
   );
   assert.match(
     template,

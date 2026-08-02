@@ -3,7 +3,7 @@ Description: AlgaGuard Thursday demo development foundation
 Parameters:
   VpcId: {Type: AWS::EC2::VPC::Id}
   SubnetId: {Type: AWS::EC2::Subnet::Id}
-  InstanceType: {Type: String, Default: m7i-flex.large, AllowedValues: [m7i-flex.large]}
+  InstanceType: {Type: String, Default: m7i-flex.large, AllowedValues: [t3.micro, m7i-flex.large]}
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
