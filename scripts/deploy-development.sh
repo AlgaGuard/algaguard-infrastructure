@@ -63,6 +63,33 @@ append_parameter() {
   rm -f "$temporary"
 }
 
+parameter_exists() {
+  aws ssm get-parameter --region "$region" \
+    --name "/algaguard/development/$1" \
+    --query Parameter.Name --output text >/dev/null 2>&1
+}
+
+append_fcm_configuration() {
+  local required=(
+    fcm-project-id
+    fcm-client-email
+    fcm-private-key-pkcs8-base64
+    fcm-token-wrapping-key-base64
+  )
+  local parameter
+  for parameter in "${required[@]}"; do
+    if ! parameter_exists "$parameter"; then
+      printf 'ALGAGUARD_ENABLE_FCM=0\n' >>"$runtime_env"
+      return
+    fi
+  done
+  append_parameter FCM_PROJECT_ID fcm-project-id
+  append_parameter FCM_CLIENT_EMAIL fcm-client-email
+  append_parameter FCM_PRIVATE_KEY_PKCS8_BASE64 fcm-private-key-pkcs8-base64
+  append_parameter FCM_TOKEN_WRAPPING_KEY_BASE64 fcm-token-wrapping-key-base64
+  printf 'ALGAGUARD_ENABLE_FCM=1\n' >>"$runtime_env"
+}
+
 install_compose
 install -d -m 0700 /opt/algaguard/runtime /opt/algaguard/bin
 install -d -m 0755 /opt/algaguard/runtime/certbot-webroot
@@ -86,6 +113,7 @@ append_parameter ALGAGUARD_FIRMWARE_RELEASE_SECRET firmware-release-secret
 append_parameter BROKER_DEVICE_AUTH_TOKEN broker-device-auth-token
 append_parameter EMQX_NODE_COOKIE emqx-node-cookie
 append_parameter QR_ONBOARDING_SIGNING_PRIVATE_KEY_PKCS8 qr-onboarding-signing-private-key-pkcs8
+append_fcm_configuration
 printf 'ALGAGUARD_ENABLE_QR_ONBOARDING=1\n' >>"$runtime_env"
 mv "$runtime_env" "$release_dir/.env"
 chmod 0600 "$release_dir/.env"

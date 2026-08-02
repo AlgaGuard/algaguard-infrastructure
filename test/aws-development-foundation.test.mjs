@@ -34,6 +34,7 @@ const startDevelopmentScript = readFileSync(
 );
 const compose = readFileSync("compose.yaml", "utf8");
 const cloudCompose = readFileSync("compose.cloud.yaml", "utf8");
+const applicationCompose = readFileSync("compose.application.yaml", "utf8");
 const cloudNginx = readFileSync("nginx/nginx.cloud.conf", "utf8");
 const realm = JSON.parse(
   readFileSync("keycloak/algaguard-development-realm.json", "utf8"),
@@ -500,4 +501,26 @@ test("deployment preserves private-key modes while granting the runtime owner ac
   );
   assert.match(deploymentScript, /systemctl disable --now sshd/);
   assert.match(deploymentScript, /systemctl is-active sshd/);
+});
+
+test("FCM is fail-closed and loads credentials only from encrypted parameters", () => {
+  assert.match(deploymentScript, /append_fcm_configuration/);
+  assert.match(deploymentScript, /fcm-project-id/);
+  assert.match(deploymentScript, /fcm-client-email/);
+  assert.match(deploymentScript, /fcm-private-key-pkcs8-base64/);
+  assert.match(deploymentScript, /fcm-token-wrapping-key-base64/);
+  assert.match(deploymentScript, /ALGAGUARD_ENABLE_FCM=0/);
+  assert.match(deploymentScript, /ALGAGUARD_ENABLE_FCM=1/);
+  assert.match(
+    applicationCompose,
+    /ALGAGUARD_ENABLE_FCM: \$\{ALGAGUARD_ENABLE_FCM:-0\}/,
+  );
+  assert.match(
+    applicationCompose,
+    /FCM_PRIVATE_KEY_PKCS8_BASE64: \$\{FCM_PRIVATE_KEY_PKCS8_BASE64:-\}/,
+  );
+  assert.doesNotMatch(
+    `${deploymentScript}\n${applicationCompose}`,
+    /-----BEGIN PRIVATE KEY-----/,
+  );
 });

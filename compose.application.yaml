@@ -126,6 +126,7 @@ services:
       ACCESS_SERVICE_URL: http://access-service:3000
       SERVICE_CLIENT_ID: algaguard-profile-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_PROFILE_SERVICE_SECRET}
+      ALERT_PROCESSOR_CLIENT_ID: algaguard-realtime-service
     ports: ["127.0.0.1:3003:3000"]
     depends_on:
       <<: *node-dependencies
@@ -289,8 +290,14 @@ services:
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
+      PROFILE_SERVICE_URL: http://profile-service:3000
       SERVICE_CLIENT_ID: algaguard-realtime-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_REALTIME_SERVICE_SECRET}
+      ALGAGUARD_ENABLE_FCM: ${ALGAGUARD_ENABLE_FCM:-0}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      FCM_PRIVATE_KEY_PKCS8_BASE64: ${FCM_PRIVATE_KEY_PKCS8_BASE64:-}
+      FCM_TOKEN_WRAPPING_KEY_BASE64: ${FCM_TOKEN_WRAPPING_KEY_BASE64:-}
       HTTP_BODY_LIMIT_BYTES: ${REALTIME_HTTP_BODY_LIMIT_BYTES}
       WS_MAX_MESSAGE_BYTES: ${WS_MAX_MESSAGE_BYTES}
       WS_MAX_SUBSCRIPTIONS: ${WS_MAX_SUBSCRIPTIONS}
@@ -305,6 +312,8 @@ services:
     depends_on:
       <<: *node-dependencies
       access-service:
+        condition: service_healthy
+      profile-service:
         condition: service_healthy
 
   api-gateway:

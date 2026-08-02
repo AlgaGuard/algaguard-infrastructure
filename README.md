@@ -41,4 +41,12 @@ The supplied values are development-only placeholders. Device and service certif
 The SSM-only AWS development demo foundation is documented in
 [AWS development demo](docs/aws-development-demo.md). Campus deployment remains
 deferred; see [deployment notes](docs/deployment-targets.md).
+
+FCM delivery is disabled by default. The development deploy enables it only
+when all four encrypted SSM parameters exist under `/algaguard/development/`:
+`fcm-project-id`, `fcm-client-email`,
+`fcm-private-key-pkcs8-base64`, and
+`fcm-token-wrapping-key-base64`. The service-account key is never stored in Git
+or image layers. If any parameter is absent, the runtime writes only
+`ALGAGUARD_ENABLE_FCM=0` and starts without the push route or sender.
 AlgaGuard platform-first implementation repository
