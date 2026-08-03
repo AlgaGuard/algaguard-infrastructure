@@ -80,6 +80,7 @@ services:
       SERVICE_CLIENT_ID: algaguard-device-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
       SERVICE_CLIENT_IDS: algaguard-access-service,algaguard-mqtt-ingestion-service,algaguard-telemetry-service,algaguard-ota-service
+      REALTIME_SERVICE_URL: http://realtime-service:3000
     ports: ["127.0.0.1:3002:3000"]
     volumes:
       - ./.local/pki:/run/algaguard-pki:ro
@@ -293,6 +294,7 @@ services:
       PROFILE_SERVICE_URL: http://profile-service:3000
       SERVICE_CLIENT_ID: algaguard-realtime-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_REALTIME_SERVICE_SECRET}
+      SERVICE_CLIENT_IDS: algaguard-device-service
       ALGAGUARD_ENABLE_FCM: ${ALGAGUARD_ENABLE_FCM:-0}
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
       FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
