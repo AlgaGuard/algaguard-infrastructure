@@ -285,15 +285,27 @@ services:
       device-service:
         condition: service_healthy
 
+  # One-shot: applies the realtime-service DB migration and exits. Kept
+  # separate from realtime-service itself so a slow migration can never race
+  # that service's own healthcheck (see the incident this replaced: a
+  # combined "migrate && serve" command intermittently exhausted the shared
+  # healthcheck failure budget on a loaded host, and every service depending
+  # on realtime-service being healthy hard-failed as a result).
+  realtime-service-migrate:
+    <<: *node-service
+    build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-realtime-service
+    image: algaguard/realtime-service:local
+    command: ["node", "dist/scripts/migrate.js"]
+    environment:
+      <<: *node-environment
+    healthcheck:
+      disable: true
+    restart: "no"
+
   realtime-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-realtime-service
-    command:
-      [
-        "sh",
-        "-c",
-        "node dist/scripts/migrate.js && exec node dist/src/index.js",
-      ]
+    image: algaguard/realtime-service:local
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
@@ -317,19 +329,14 @@ services:
       WS_BACKPRESSURE_BYTES: ${WS_BACKPRESSURE_BYTES}
       WS_PREAUTH_BUFFER_MESSAGES: ${WS_PREAUTH_BUFFER_MESSAGES}
     ports: ["127.0.0.1:3008:3000"]
-    healthcheck:
-      <<: *node-healthcheck
-      # This service runs a DB migration before it starts serving, unlike
-      # every other node-service; the shared 200s failure budget (10s
-      # interval x 20 retries) can be exhausted by the migration alone on a
-      # cold host, so it gets extra grace before failures start counting.
-      start_period: 120s
     depends_on:
       <<: *node-dependencies
       access-service:
         condition: service_healthy
       profile-service:
         condition: service_healthy
+      realtime-service-migrate:
+        condition: service_completed_successfully
 
   api-gateway:
     <<: *node-service

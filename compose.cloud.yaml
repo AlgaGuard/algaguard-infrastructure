@@ -30,6 +30,9 @@ services:
   ota-service:
     image: ${ECR_REGISTRY}/algaguard/ota-service:${OTA_SERVICE_SHA}
     pull_policy: always
+  realtime-service-migrate:
+    image: ${ECR_REGISTRY}/algaguard/realtime-service:${REALTIME_SERVICE_SHA}
+    pull_policy: always
   realtime-service:
     image: ${ECR_REGISTRY}/algaguard/realtime-service:${REALTIME_SERVICE_SHA}
     pull_policy: always
