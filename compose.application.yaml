@@ -288,6 +288,12 @@ services:
   realtime-service:
     <<: *node-service
     build: ${ALGAGUARD_REPOS_ROOT:-..}/algaguard-realtime-service
+    command:
+      [
+        "sh",
+        "-c",
+        "node dist/scripts/migrate.js && exec node dist/src/index.js",
+      ]
     environment:
       <<: *node-environment
       ACCESS_SERVICE_URL: http://access-service:3000
