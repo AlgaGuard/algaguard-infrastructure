@@ -317,6 +317,13 @@ services:
       WS_BACKPRESSURE_BYTES: ${WS_BACKPRESSURE_BYTES}
       WS_PREAUTH_BUFFER_MESSAGES: ${WS_PREAUTH_BUFFER_MESSAGES}
     ports: ["127.0.0.1:3008:3000"]
+    healthcheck:
+      <<: *node-healthcheck
+      # This service runs a DB migration before it starts serving, unlike
+      # every other node-service; the shared 200s failure budget (10s
+      # interval x 20 retries) can be exhausted by the migration alone on a
+      # cold host, so it gets extra grace before failures start counting.
+      start_period: 120s
     depends_on:
       <<: *node-dependencies
       access-service:
