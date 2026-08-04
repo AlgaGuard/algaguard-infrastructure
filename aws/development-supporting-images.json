@@ -1,11 +1,11 @@
 {
   "access-service": "6ba9f36318648143fea0ed5a449af5fcd65b98ff",
   "api-gateway": "1c61d89762f7e70f0b03ea02013167c91ee05f7d",
-  "command-service": "42b3a50714fe793ae7050381645761c5013e4ff7",
-  "profile-service": "de1f0fce2351cd27234a20c53308d952e8924360",
-  "realtime-service": "281fa866c14c5119579544d50b1359ba8793ee72",
-  "telemetry-service": "9bc78ac76d6826e350abece67057b03e96d5848e",
+  "command-service": "a4270f2a9b968c8ffe1061b28c6c6cfb34b5a08d",
+  "profile-service": "7fa4801de3af403b0c084a0ac72fab2a0d41bbef",
+  "realtime-service": "e84c8c878855897e7a29f3194e8420d9cbeaf865",
+  "telemetry-service": "785ff37e53081b3713c63154665ba1adb7233f16",
   "ota-service": "93da828590ec9df5fb5c29414523564d3e80dcd5",
-  "mqtt-ingestion-service": "f134e248227610773f98cd2c9a69ca1f8955e96b",
-  "web-dashboard": "980fb58aabfa7cc8764dfb94ce5ad90cf3d16695"
+  "mqtt-ingestion-service": "59afe89f10980d498414e460b27af80c17b34c1a",
+  "web-dashboard": "98e4c68ea3dd07564dc2c31e4b5eb192401b5e4a"
 }
