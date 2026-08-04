@@ -44,6 +44,13 @@ services:
       KC_HOSTNAME: ${PUBLIC_KEYCLOAK_URL}
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_PROXY_HEADERS: xforwarded
+      # Local dev serves Keycloak under a path prefix (nginx /auth/); without
+      # telling Keycloak its own relative path, KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+      # reconstructs token_endpoint/jwks_uri without the /auth prefix, which
+      # 404s (or gets misrouted) through nginx. Production uses a dedicated
+      # subdomain with no prefix, so this stays "/" (Keycloak's own default)
+      # there since KEYCLOAK_RELATIVE_PATH is never set in that environment.
+      KC_HTTP_RELATIVE_PATH: ${KEYCLOAK_RELATIVE_PATH:-/}
       ALGAGUARD_ACCESS_SERVICE_SECRET: ${ALGAGUARD_ACCESS_SERVICE_SECRET}
       ALGAGUARD_DEVICE_SERVICE_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
       ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET: ${ALGAGUARD_MQTT_INGESTION_SERVICE_SECRET}
@@ -65,7 +72,7 @@ services:
         - CMD-SHELL
         - >-
           exec 3<>/dev/tcp/127.0.0.1/9000;
-          echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          echo -e 'GET ${KEYCLOAK_RELATIVE_PATH:-}/health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;
           grep '200 OK' <&3
       interval: 15s
       timeout: 5s
