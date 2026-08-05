@@ -4,8 +4,8 @@
   "command-service": "868691b703f066177b644d29a761d6e9368df113",
   "profile-service": "7fa4801de3af403b0c084a0ac72fab2a0d41bbef",
   "realtime-service": "e84c8c878855897e7a29f3194e8420d9cbeaf865",
-  "telemetry-service": "785ff37e53081b3713c63154665ba1adb7233f16",
+  "telemetry-service": "52b786668d7b5ab44f9f52a51b1337a93596028f",
   "ota-service": "93da828590ec9df5fb5c29414523564d3e80dcd5",
-  "mqtt-ingestion-service": "59afe89f10980d498414e460b27af80c17b34c1a",
+  "mqtt-ingestion-service": "d4e59af575dc835ccd0294a5f358406f70d08238",
   "web-dashboard": "0785b0da80e8bbee5cb70e4760cf4386f46774c6"
 }
