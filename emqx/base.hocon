@@ -116,10 +116,17 @@ actions.http.device_disconnected {
 }
 
 rule_engine.rules.device_connected {
-  # No clientid filter: only clients holding a device-CA-signed certificate
-  # can complete this listener's mTLS handshake at all, and that
-  # certificate's CN is always the device_id (see create_csr() in the
-  # firmware), so every clientid reaching this rule is already an AG-XXXXXX.
+  # $events/client_connected fires for every listener, not just the device
+  # one -- services (command-service, ota-service, mqtt-ingestion-service,
+  # ...) also connect via listeners.ssl.internal with a service-ca cert, so
+  # this also fires for them. Filtering it out here was tried and abandoned:
+  # every EMQX rule-SQL function attempted against a live 5.8 instance
+  # (=~, regex_match(), substr()) silently failed to match even trivially
+  # true cases -- only bare column-to-literal equality reliably worked, and
+  # sockname's value is the listener's actual (dynamic, per-container) IP,
+  # not a fixed string, so equality can't scope this to one listener either.
+  # Filtering happens at the HTTP boundary instead: the status route no-ops
+  # on any id that isn't a valid AG-XXXXXX device id.
   sql = "SELECT clientid, now_rfc3339() as occurred_at FROM \"$events/client_connected\""
   actions = ["http:device_connected"]
   enable = true
