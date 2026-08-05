@@ -67,3 +67,66 @@ authorization {
     path = "/opt/emqx/etc/acl.conf"
   }]
 }
+
+# Drives the web/mobile dashboards' online/offline device status: on every
+# device-listener client connect/disconnect, tell device-service so it can
+# populate device_status_projection (previously nothing did, so every device
+# always showed offline regardless of whether it was actually connected).
+# __BROKER_DEVICE_AUTH_TOKEN__ is substituted by scripts/render-emqx-config.mjs
+# before this file is mounted -- EMQX's rule-engine action config does not
+# support ${ENV_VAR} interpolation or EMQX_A__B__C env overrides (verified
+# empirically), unlike the core listener/authentication config above.
+connectors.http.device_status {
+  url = "http://device-service:3000"
+  connect_timeout = "5s"
+  pool_size = 4
+  enable = true
+}
+
+actions.http.device_connected {
+  connector = "device_status"
+  parameters {
+    method = "put"
+    path = "/v1/internal/devices/${clientid}/status"
+    headers {
+      "content-type" = "application/json"
+      "authorization" = "Bearer __BROKER_DEVICE_AUTH_TOKEN__"
+    }
+    body = "{\"observedAt\": \"${occurred_at}\", \"status\": {\"online\": true}}"
+  }
+  resource_opts {
+    request_ttl = "5s"
+  }
+}
+
+actions.http.device_disconnected {
+  connector = "device_status"
+  parameters {
+    method = "put"
+    path = "/v1/internal/devices/${clientid}/status"
+    headers {
+      "content-type" = "application/json"
+      "authorization" = "Bearer __BROKER_DEVICE_AUTH_TOKEN__"
+    }
+    body = "{\"observedAt\": \"${occurred_at}\", \"status\": {\"online\": false}}"
+  }
+  resource_opts {
+    request_ttl = "5s"
+  }
+}
+
+rule_engine.rules.device_connected {
+  # No clientid filter: only clients holding a device-CA-signed certificate
+  # can complete this listener's mTLS handshake at all, and that
+  # certificate's CN is always the device_id (see create_csr() in the
+  # firmware), so every clientid reaching this rule is already an AG-XXXXXX.
+  sql = "SELECT clientid, now_rfc3339() as occurred_at FROM \"$events/client_connected\""
+  actions = ["http:device_connected"]
+  enable = true
+}
+
+rule_engine.rules.device_disconnected {
+  sql = "SELECT clientid, now_rfc3339() as occurred_at FROM \"$events/client_disconnected\""
+  actions = ["http:device_disconnected"]
+  enable = true
+}

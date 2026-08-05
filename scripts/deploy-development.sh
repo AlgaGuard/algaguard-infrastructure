@@ -118,6 +118,19 @@ printf 'ALGAGUARD_ENABLE_QR_ONBOARDING=1\n' >>"$runtime_env"
 mv "$runtime_env" "$release_dir/.env"
 chmod 0600 "$release_dir/.env"
 
+# EMQX's rule-engine action config (used for the device online/offline
+# webhook) does not support ${ENV_VAR} interpolation or EMQX_A__B__C-style
+# environment overrides, unlike its core listener/authentication config --
+# verified empirically against a live EMQX 5.8 instance. Render the token
+# into this release's own base.hocon before it gets mounted, the same way
+# the PKI material below is generated fresh per release.
+broker_device_auth_token=$(awk -F= '$1 == "BROKER_DEVICE_AUTH_TOKEN" {sub(/^[^=]*=/, ""); print; exit}' "$release_dir/.env")
+test -n "$broker_device_auth_token"
+docker run --rm --network none \
+  -e "BROKER_DEVICE_AUTH_TOKEN=$broker_device_auth_token" \
+  -v "$release_dir:/workspace" \
+  -w /workspace node:22-bookworm node scripts/render-emqx-config.mjs emqx/base.hocon
+
 if [ ! -f /opt/algaguard/runtime/.pki-ready ]; then
   docker run --rm --network none \
     -v "$release_dir:/workspace" \
