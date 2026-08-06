@@ -81,6 +81,7 @@ services:
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
       SERVICE_CLIENT_IDS: algaguard-access-service,algaguard-mqtt-ingestion-service,algaguard-telemetry-service,algaguard-ota-service
       REALTIME_SERVICE_URL: http://realtime-service:3000
+      COMMAND_SERVICE_URL: http://command-service:3000
     ports: ["127.0.0.1:3002:3000"]
     volumes:
       - ./.local/pki:/run/algaguard-pki:ro
