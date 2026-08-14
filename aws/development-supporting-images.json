@@ -3,9 +3,9 @@
   "api-gateway": "1c61d89762f7e70f0b03ea02013167c91ee05f7d",
   "command-service": "868691b703f066177b644d29a761d6e9368df113",
   "profile-service": "5a14453f3bbcdb18aca6f531136a83077e3501aa",
-  "realtime-service": "a0b1f5418d702d38d23d0af8d9df141bd666385b",
-  "telemetry-service": "2f09c45c28705acab72e6b55e54709a7e1378a1f",
+  "realtime-service": "ee8e1157bfaf62af16a7909d4c601acc60049e7b",
+  "telemetry-service": "1a1f31add5bfdfc876970a664ac7698b79c07a99",
   "ota-service": "93da828590ec9df5fb5c29414523564d3e80dcd5",
-  "mqtt-ingestion-service": "0a16a6db82d524316c5ebc4589f2e3e52bc8f0b5",
+  "mqtt-ingestion-service": "70cba57690ad37881f23e867034d3248dfd61f16",
   "web-dashboard": "e0c2db81edc276f36738580c4026aefc506879fb"
 }
