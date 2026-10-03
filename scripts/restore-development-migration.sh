@@ -8,7 +8,7 @@ case "$object" in
   *) echo 'Unsafe migration object key.' >&2; exit 2 ;;
 esac
 
-bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-862620869833-ap-southeast-1}
+bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-017410086139-ap-southeast-1}
 archive=$(mktemp /opt/algaguard/runtime/migration-restore.XXXXXX.tgz)
 checksum=$(mktemp /opt/algaguard/runtime/migration-restore.XXXXXX.sha256)
 rollback=$(mktemp -d /opt/algaguard/runtime/migration-rollback.XXXXXX)

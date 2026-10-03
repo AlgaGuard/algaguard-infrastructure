@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 release=$(readlink -f /opt/algaguard/current)
-bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-862620869833-ap-southeast-1}
+bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-017410086139-ap-southeast-1}
 object=$(aws s3api list-objects-v2 --bucket "$bucket" --prefix postgresql/ \
   --query 'sort_by(Contents,&LastModified)[-1].Key' --output text)
 test "$object" != None

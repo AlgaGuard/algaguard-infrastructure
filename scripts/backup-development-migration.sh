@@ -2,7 +2,7 @@
 set -euo pipefail
 
 test "$(id -u)" -eq 0
-bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-862620869833-ap-southeast-1}
+bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-017410086139-ap-southeast-1}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 archive=$(mktemp /opt/algaguard/runtime/migration.XXXXXX.tgz)
 checksum="${archive}.sha256"
