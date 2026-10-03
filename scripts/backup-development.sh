@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 release=$(readlink -f /opt/algaguard/current)
-bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-862620869833-ap-southeast-1}
+bucket=${ALGAGUARD_BACKUP_BUCKET:-algaguard-dev-backups-017410086139-ap-southeast-1}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 temporary=$(mktemp /opt/algaguard/runtime/postgres.XXXXXX.dump)
 trap 'rm -f "$temporary"' EXIT
