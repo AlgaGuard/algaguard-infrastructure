@@ -228,7 +228,15 @@ const devices = (
     { headers: userHeaders },
   )
 ).body.items;
-let device = devices.find((item) => item.tankId === tankId);
+// The device list hides unpaired devices, so the seeded (never paired) device
+// is only found again through the previous run's state file. A database reset
+// gives the organization a new id, which correctly forces a fresh device.
+const previous = readState();
+let device =
+  devices.find((item) => item.tankId === tankId) ??
+  (previous.organizationId === organization.id && previous.deviceUuid
+    ? { deviceId: previous.deviceId, deviceUuid: previous.deviceUuid }
+    : undefined);
 if (!device) {
   device = (
     await requestJson("http://127.0.0.1:3002/v1/devices", {

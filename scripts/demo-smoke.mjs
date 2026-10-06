@@ -107,21 +107,15 @@ const organizations = (
 ).items;
 if (!organizations.some((item) => item.id === seed.organizationId))
   throw new Error("Seeded organization is not visible to the demo user.");
-const devices = (
-  await requestJson(
-    `http://127.0.0.1:3002/v1/devices?organizationId=${seed.organizationId}`,
-    { headers },
-  )
-).items;
-if (
-  !devices.some(
-    (item) =>
-      item.deviceUuid === seed.deviceUuid && item.tankId === seed.tankId,
-  )
-)
-  throw new Error(
-    "Seeded tank/device association is not visible to the demo user.",
-  );
+// The seeded device is never paired, and unpaired devices are neither listed
+// nor readable until they are claimed, so only check that the demo user can
+// list the organization's devices.
+const devices = await requestJson(
+  `http://127.0.0.1:3002/v1/devices?organizationId=${seed.organizationId}`,
+  { headers },
+);
+if (!Array.isArray(devices.items))
+  throw new Error("Device listing is not available to the demo user.");
 console.log(
   "Authenticated demo smoke passed for the seeded organization, tank, and device.",
 );
