@@ -79,8 +79,16 @@ NGINX_HTTPS_PORT=443
 CERTBOT_WEBROOT=/opt/algaguard/runtime/certbot-webroot
 EOF
 
-cp compose.yaml compose.application.yaml compose.cloud.yaml package.json "$work/"
-cp -r database emqx keycloak nginx observability scripts "$work/"
+# Ship the committed files with LF endings: a Windows checkout (core.autocrlf)
+# has CRLF shell scripts, which fail on the Linux VM. This also makes the
+# release exactly $infra_sha, never uncommitted local edits.
+git -c core.autocrlf=false archive --format=tar HEAD \
+  compose.yaml compose.application.yaml compose.cloud.yaml package.json \
+  database emqx keycloak nginx observability scripts | tar -x -C "$work"
+if grep -rlI $'\r' "$work" >/dev/null; then
+  echo "CRLF line endings in the release bundle" >&2
+  exit 1
+fi
 tar -czf "$work.tgz" -C "$work" .
 trap 'rm -rf "$work" "$work.tgz"' EXIT
 
