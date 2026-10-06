@@ -5,7 +5,7 @@
   "profile-service": "227096de15ba6cb96505f7383d8dcb95ae61eedf",
   "realtime-service": "416ca9de24655338bc0b6a629496d8afcb27b3b1",
   "telemetry-service": "5fc35fe88003b6224e2e5ced3eae4764447257c7",
-  "ota-service": "8b91ad318707cce183e194578be2576376418509",
+  "ota-service": "76acfafcbf452467f814aa43648a4775e62bddba",
   "mqtt-ingestion-service": "41872d9e8bfcf3183e30d134fa5f2293b6350865",
   "web-dashboard": "7009f6771254b4dd8329235fb962bde5c5d2fa54"
 }
