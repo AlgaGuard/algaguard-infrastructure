@@ -107,6 +107,33 @@ services:
       - ./.local/pki/emqx/tls.key:/source/emqx.key:ro
       - emqx-pki:/target
 
+  # base.hocon carries a __BROKER_DEVICE_AUTH_TOKEN__ placeholder that EMQX
+  # cannot interpolate itself (see scripts/render-emqx-config.mjs). Mounting
+  # the template directly made EMQX send the placeholder as its bearer token,
+  # so device-service rejected every online/offline status update. The cloud
+  # deploy already renders the file in place, so only render when the
+  # placeholder is still there.
+  emqx-config-init:
+    image: node:22-alpine
+    user: "0:0"
+    network_mode: none
+    restart: "no"
+    environment:
+      BROKER_DEVICE_AUTH_TOKEN: ${BROKER_DEVICE_AUTH_TOKEN}
+    entrypoint: [sh, -ec]
+    command:
+      - |
+        cp /source/base.hocon /target/base.hocon
+        if grep -q __BROKER_DEVICE_AUTH_TOKEN__ /target/base.hocon; then
+          node /scripts/render-emqx-config.mjs /target/base.hocon
+        fi
+        chown 1000:1000 /target/base.hocon
+        chmod 0600 /target/base.hocon
+    volumes:
+      - ./emqx/base.hocon:/source/base.hocon:ro
+      - ./scripts/render-emqx-config.mjs:/scripts/render-emqx-config.mjs:ro
+      - emqx-config:/target
+
   emqx:
     image: emqx/emqx:5.8
     environment:
@@ -118,13 +145,20 @@ services:
         headers = {"content-type" = "application/json", "authorization" = "Bearer ${BROKER_DEVICE_AUTH_TOKEN}"},
         body = {clientId = "$${clientid}", certificatePem = "$${username}"},
         connect_timeout = 5s, request_timeout = 5s, pool_size = 8, enable = true}]
+    entrypoint: [sh, -ec]
+    command:
+      - |
+        cp /opt/emqx/etc/algaguard-config/base.hocon /opt/emqx/etc/base.hocon
+        exec /usr/bin/docker-entrypoint.sh /opt/emqx/bin/emqx foreground
     volumes:
       - emqx-data:/opt/emqx/data
-      - ./emqx/base.hocon:/opt/emqx/etc/base.hocon:ro
+      - emqx-config:/opt/emqx/etc/algaguard-config:ro
       - ./emqx/acl.conf:/opt/emqx/etc/acl.conf:ro
       - emqx-pki:/opt/emqx/etc/algaguard-pki:ro
     depends_on:
       emqx-pki-init:
+        condition: service_completed_successfully
+      emqx-config-init:
         condition: service_completed_successfully
     ports:
       - "${DEVICE_MQTT_BIND_ADDRESS:-127.0.0.1}:8883:8883"
@@ -268,6 +302,7 @@ volumes:
   redis-data:
   emqx-data:
   emqx-pki:
+  emqx-config:
   minio-data:
   prometheus-data:
   loki-data:
