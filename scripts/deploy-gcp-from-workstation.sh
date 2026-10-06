@@ -18,9 +18,14 @@ infra_sha=$(git rev-parse HEAD)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-filter='. + {"device-service": $device} | to_entries[] |
-  "\(.key|ascii_upcase|gsub("-";"_"))_SHA=\(.value)"'
-jq -r --arg device "$device_sha" "$filter" aws/development-supporting-images.json >"$work/release.env"
+# <SERVICE>_SHA=<commit> for every pinned image plus device-service (node,
+# not jq, so this also runs from a plain Windows Git Bash).
+DEVICE_SHA="$device_sha" node -e '
+  const pins = { ...require("./aws/development-supporting-images.json"),
+                 "device-service": process.env.DEVICE_SHA };
+  for (const [image, sha] of Object.entries(pins))
+    console.log(`${image.toUpperCase().replace(/-/g, "_")}_SHA=${sha}`);
+' >"$work/release.env"
 cat >>"$work/release.env" <<EOF
 COMPOSE_PROJECT_NAME=algaguard-development
 ECR_REGISTRY=$registry_host/$project/algaguard
