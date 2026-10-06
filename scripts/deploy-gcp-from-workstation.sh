@@ -98,9 +98,23 @@ tar -czf "$work.tgz" -C "$work" .
 trap 'rm -rf "$work" "$work.tgz"' EXIT
 
 release="/opt/algaguard/releases/$infra_sha"
+# The remote steps live in a small runner script: gcloud.cmd on Windows hands
+# --command through cmd.exe, which splits on newlines and on "&&".
+cat >"$work.run.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+sudo install -d -m 0755 $release
+sudo tar -xzf /tmp/algaguard-release.tgz -C $release
+sudo chmod 0755 $release/scripts/*.sh
+rm -f /tmp/algaguard-release.tgz
+sudo GCP_PROJECT=$project GCP_REGISTRY_HOST=$registry_host \
+  ALGAGUARD_DOMAIN=algaguard.bosilu.dev $release/scripts/deploy-gcp.sh $release
+EOF
+trap 'rm -rf "$work" "$work.tgz" "$work.run.sh"' EXIT
 "$gcloud" compute scp "$work.tgz" "$instance:/tmp/algaguard-release.tgz" \
   --project "$project" --zone "$zone" --tunnel-through-iap --strict-host-key-checking=no --quiet
+"$gcloud" compute scp "$work.run.sh" "$instance:/tmp/algaguard-release-run.sh" \
+  --project "$project" --zone "$zone" --tunnel-through-iap --strict-host-key-checking=no --quiet
 "$gcloud" compute ssh "$instance" --project "$project" --zone "$zone" \
-  --tunnel-through-iap --strict-host-key-checking=no --quiet --command \
-  "set -eu; sudo install -d -m 0755 $release && sudo tar -xzf /tmp/algaguard-release.tgz -C $release && sudo chmod 0755 $release/scripts/*.sh && rm -f /tmp/algaguard-release.tgz && sudo GCP_PROJECT=$project GCP_REGISTRY_HOST=$registry_host ALGAGUARD_DOMAIN=algaguard.bosilu.dev $release/scripts/deploy-gcp.sh $release"
-# (one line: gcloud.cmd on Windows cannot pass a multi-line --command)
+  --tunnel-through-iap --strict-host-key-checking=no --quiet \
+  --command "bash /tmp/algaguard-release-run.sh"
