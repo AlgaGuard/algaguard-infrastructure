@@ -101,9 +101,6 @@ release="/opt/algaguard/releases/$infra_sha"
 "$gcloud" compute scp "$work.tgz" "$instance:/tmp/algaguard-release.tgz" \
   --project "$project" --zone "$zone" --tunnel-through-iap --strict-host-key-checking=no --quiet
 "$gcloud" compute ssh "$instance" --project "$project" --zone "$zone" \
-  --tunnel-through-iap --strict-host-key-checking=no --quiet --command "set -eu
-sudo install -d -m 0755 $release
-sudo tar -xzf /tmp/algaguard-release.tgz -C $release
-sudo chmod 0755 $release/scripts/*.sh
-sudo GCP_PROJECT=$project GCP_REGISTRY_HOST=$registry_host ALGAGUARD_DOMAIN=algaguard.bosilu.dev $release/scripts/deploy-gcp.sh $release
-rm -f /tmp/algaguard-release.tgz"
+  --tunnel-through-iap --strict-host-key-checking=no --quiet --command \
+  "set -eu; sudo install -d -m 0755 $release && sudo tar -xzf /tmp/algaguard-release.tgz -C $release && sudo chmod 0755 $release/scripts/*.sh && rm -f /tmp/algaguard-release.tgz && sudo GCP_PROJECT=$project GCP_REGISTRY_HOST=$registry_host ALGAGUARD_DOMAIN=algaguard.bosilu.dev $release/scripts/deploy-gcp.sh $release"
+# (one line: gcloud.cmd on Windows cannot pass a multi-line --command)
