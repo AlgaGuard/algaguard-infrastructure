@@ -17,6 +17,13 @@ import test from "node:test";
 import mqtt from "mqtt";
 import { Client as MinioClient } from "minio";
 
+// Keycloak serves under KEYCLOAK_RELATIVE_PATH (/auth locally), read from the
+// same env file the stack is started with (scripts/credential-e2e.sh).
+const keycloakRelativePath =
+  /^KEYCLOAK_RELATIVE_PATH=(.*)$/m
+    .exec(readFileSync(".env.example", "utf8"))?.[1]
+    ?.trim()
+    .replace(/\/$/, "") ?? "";
 const urls = {
   access: "http://127.0.0.1:3001/v1",
   device: "http://127.0.0.1:3002/v1",
@@ -25,7 +32,7 @@ const urls = {
   command: "http://127.0.0.1:3006/v1",
   ota: "http://127.0.0.1:3007/v1",
   realtime: "http://127.0.0.1:3008/v1",
-  keycloak: "http://127.0.0.1:8081",
+  keycloak: `http://127.0.0.1:8081${keycloakRelativePath}`,
 };
 const composePrefix = [
   "compose",
