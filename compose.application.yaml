@@ -80,8 +80,12 @@ services:
       SERVICE_CLIENT_ID: algaguard-device-service
       SERVICE_CLIENT_SECRET: ${ALGAGUARD_DEVICE_SERVICE_SECRET}
       SERVICE_CLIENT_IDS: algaguard-access-service,algaguard-mqtt-ingestion-service,algaguard-telemetry-service,algaguard-ota-service
-      REALTIME_SERVICE_URL: http://realtime-service:3000
-      COMMAND_SERVICE_URL: http://command-service:3000
+      # Internal service-to-service calls use gRPC on each service's
+      # GRPC_PORT (50051). Physical unpair verification and the realtime
+      # unpair notification are switched off if these are left unset.
+      ACCESS_SERVICE_GRPC_ADDRESS: access-service:50051
+      REALTIME_SERVICE_GRPC_ADDRESS: realtime-service:50051
+      COMMAND_SERVICE_GRPC_ADDRESS: command-service:50051
     ports: ["127.0.0.1:3002:3000"]
     volumes:
       - ./.local/pki:/run/algaguard-pki:ro
