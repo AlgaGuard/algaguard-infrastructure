@@ -115,6 +115,16 @@ trap 'rm -rf "$work" "$work.tgz" "$work.run.sh"' EXIT
   --project "$project" --zone "$zone" --tunnel-through-iap --strict-host-key-checking=no --quiet
 "$gcloud" compute scp "$work.run.sh" "$instance:/tmp/algaguard-release-run.sh" \
   --project "$project" --zone "$zone" --tunnel-through-iap --strict-host-key-checking=no --quiet
-"$gcloud" compute ssh "$instance" --project "$project" --zone "$zone" \
-  --tunnel-through-iap --strict-host-key-checking=no --quiet \
-  --command "bash /tmp/algaguard-release-run.sh"
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*)
+    # From Git Bash, gcloud's IAP ProxyCommand gets the unquoted
+    # "C:\Program Files (x86)\..." path and cmd.exe fails on it; the same
+    # call works when started from PowerShell.
+    powershell.exe -NoProfile -Command "& '$(cygpath -w "$gcloud")' compute ssh $instance --project $project --zone $zone --tunnel-through-iap --strict-host-key-checking=no --quiet --command 'bash /tmp/algaguard-release-run.sh'; exit \$LASTEXITCODE"
+    ;;
+  *)
+    "$gcloud" compute ssh "$instance" --project "$project" --zone "$zone" \
+      --tunnel-through-iap --strict-host-key-checking=no --quiet \
+      --command "bash /tmp/algaguard-release-run.sh"
+    ;;
+esac
